@@ -20,9 +20,7 @@ safe_grim <- function(x_str, n_str, digits_x, items) {
   n <- suppressWarnings(as.integer(parse_num(n_str)))
   dx <- suppressWarnings(as.integer(digits_x))
   it <- suppressWarnings(as.integer(items))
-  if (
-    is.na(x) || is.na(n) || n < 2 || is.na(dx) || dx < 0 || is.na(it) || it < 1
-  ) {
+  if (anyNA(c(x, n, dx, it)) || n < 2 || dx < 0 || it < 1) {
     return(NA)
   }
   tryCatch(grim(x = x, n = n, digits_x = dx, items = it), error = function(e) {
@@ -37,18 +35,7 @@ safe_grimmer <- function(x_str, sd_str, n_str, digits_x, digits_sd, items) {
   dx <- suppressWarnings(as.integer(digits_x))
   ds <- suppressWarnings(as.integer(digits_sd))
   it <- suppressWarnings(as.integer(items))
-  if (
-    is.na(x) ||
-      is.na(sd) ||
-      is.na(n) ||
-      n < 2 ||
-      is.na(dx) ||
-      dx < 0 ||
-      is.na(ds) ||
-      ds < 0 ||
-      is.na(it) ||
-      it < 1
-  ) {
+  if (anyNA(c(x, sd, n, dx, ds, it)) || n < 2 || dx < 0 || ds < 0 || it < 1) {
     return(list(ok = NA, reason = ""))
   }
   r <- tryCatch(
