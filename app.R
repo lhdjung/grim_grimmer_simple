@@ -2,6 +2,8 @@ library(shiny)
 library(bslib)
 library(scrutiny)
 
+addResourcePath("images", "images")
+
 MAX_ROWS <- 15
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -13,23 +15,32 @@ parse_num <- function(s) {
   suppressWarnings(as.numeric(gsub(",", ".", trimws(s))))
 }
 
-safe_grim <- function(x_str, n_str) {
+safe_grim <- function(x_str, n_str, digits_x) {
   x <- parse_num(x_str)
   n <- suppressWarnings(as.integer(parse_num(n_str)))
-  if (is.na(x) || is.na(n) || n < 2) {
+  dx <- suppressWarnings(as.integer(digits_x))
+  if (is.na(x) || is.na(n) || n < 2 || is.na(dx) || dx < 0) {
     return(NA)
   }
-  tryCatch(
-    grim(x = x, n = n, digits_x = decimal_places_scalar(x_str)),
-    error = function(e) NA
-  )
+  tryCatch(grim(x = x, n = n, digits_x = dx), error = function(e) NA)
 }
 
-safe_grimmer <- function(x_str, sd_str, n_str) {
+safe_grimmer <- function(x_str, sd_str, n_str, digits_x, digits_sd) {
   x <- parse_num(x_str)
   sd <- parse_num(sd_str)
   n <- suppressWarnings(as.integer(parse_num(n_str)))
-  if (is.na(x) || is.na(sd) || is.na(n) || n < 2) {
+  dx <- suppressWarnings(as.integer(digits_x))
+  ds <- suppressWarnings(as.integer(digits_sd))
+  if (
+    is.na(x) ||
+      is.na(sd) ||
+      is.na(n) ||
+      n < 2 ||
+      is.na(dx) ||
+      dx < 0 ||
+      is.na(ds) ||
+      ds < 0
+  ) {
     return(list(ok = NA, reason = ""))
   }
   r <- tryCatch(
@@ -37,8 +48,8 @@ safe_grimmer <- function(x_str, sd_str, n_str) {
       x = x,
       sd = sd,
       n = n,
-      digits_x = decimal_places_scalar(x_str),
-      digits_sd = decimal_places_scalar(sd_str),
+      digits_x = dx,
+      digits_sd = ds,
       show_reason = TRUE
     ),
     error = function(e) NULL
@@ -59,6 +70,81 @@ friendly_reason <- function(reason) {
   reason
 }
 
+# ── validation ────────────────────────────────────────────────────────────────
+
+# Returns an error string, or NULL if all inputs are valid / not yet entered.
+validate_grim_row <- function(x_str, n_str, dp_x) {
+  if (!is.null(x_str) && nzchar(trimws(x_str))) {
+    if (is.na(parse_num(x_str))) {
+      return("Mean must be a number")
+    }
+    if (!is.null(dp_x) && !is.na(dp_x) && dp_x != round(dp_x)) {
+      return("Decimal places must be a whole number")
+    }
+    dp_int <- suppressWarnings(as.integer(dp_x))
+    if (!is.na(dp_int)) {
+      actual <- decimal_places_scalar(x_str)
+      if (dp_int < actual) {
+        return(sprintf(
+          "Mean has %d decimal place%s but d.p. is set to %d",
+          actual,
+          if (actual == 1L) "" else "s",
+          dp_int
+        ))
+      }
+    }
+  }
+  if (!is.null(n_str) && nzchar(trimws(n_str))) {
+    n_num <- parse_num(n_str)
+    if (is.na(n_num)) {
+      return("N must be a number")
+    }
+    if (n_num != round(n_num)) {
+      return("N must be a whole number")
+    }
+    if (n_num < 2) return("N must be at least 2")
+  }
+  NULL
+}
+
+validate_grimmer_row <- function(x_str, sd_str, n_str, dp_x, dp_sd) {
+  err <- validate_grim_row(x_str, n_str, dp_x)
+  if (!is.null(err)) {
+    return(err)
+  }
+  if (!is.null(sd_str) && nzchar(trimws(sd_str))) {
+    if (is.na(parse_num(sd_str))) {
+      return("SD must be a number")
+    }
+    if (!is.null(dp_sd) && !is.na(dp_sd) && dp_sd != round(dp_sd)) {
+      return("SD decimal places must be a whole number")
+    }
+    dp_int <- suppressWarnings(as.integer(dp_sd))
+    if (!is.na(dp_int)) {
+      actual <- decimal_places_scalar(sd_str)
+      if (dp_int < actual) {
+        return(sprintf(
+          "SD has %d decimal place%s but d.p. is set to %d",
+          actual,
+          if (actual == 1L) "" else "s",
+          dp_int
+        ))
+      }
+    }
+  }
+  NULL
+}
+
+# ── result / error UI ─────────────────────────────────────────────────────────
+
+error_ui <- function(msg) {
+  span(
+    style = "color:#e67e22; font-size:.8rem;",
+    HTML("&#9888;&nbsp;"),
+    msg
+  )
+}
+
 result_ui <- function(ok, reason = NULL) {
   if (is.na(ok)) {
     return(span())
@@ -69,14 +155,14 @@ result_ui <- function(ok, reason = NULL) {
       HTML("&#10003;&nbsp; Consistent")
     )
   } else {
-    tagList(
-      span(
-        class = "badge rounded-pill bg-danger px-3 py-2",
-        HTML("&#10007;&nbsp; Inconsistent")
-      ),
-      if (!is.null(reason) && nzchar(reason)) {
-        span(class = "text-muted small ms-2", friendly_reason(reason))
-      }
+    span(
+      class = "badge rounded-pill bg-danger px-3 py-2",
+      title = if (!is.null(reason) && nzchar(reason)) {
+        friendly_reason(reason)
+      } else {
+        NULL
+      },
+      HTML("&#10007;&nbsp; Inconsistent")
     )
   }
 }
@@ -109,28 +195,34 @@ next_free <- function(active) {
   min(candidate)
 }
 
-# ── row UI builders ───────────────────────────────────────────────────────────
+# ── row UI (pre-created; show/hide via CSS) ───────────────────────────────────
 
 rm_btn <- function(id) {
   actionButton(
     id,
-    label = HTML("&times;"),
-    class = "btn btn-sm btn-link text-secondary p-0",
-    style = "font-size:1.1rem; line-height:1; opacity:.5;",
+    label = tags$img(
+      src = "images/trash-can.svg",
+      height = "16px",
+      alt = "Remove"
+    ),
+    class = "btn btn-sm p-1 rm-btn",
+    style = "line-height:1;",
     title = "Remove this row"
   )
 }
 
-grim_row_ui <- function(id, pos) {
+# numericInput for decimal places (shared by GRIM and GRIMMER rows)
+dp_input <- function(id) {
+  numericInput(id, NULL, value = 2, min = 0, max = 10, step = 1, width = "80px")
+}
+
+grim_row <- function(id) {
   div(
+    id = paste0("grim_slot_", id),
     class = "row g-2 align-items-center mb-1",
+    style = if (id <= 3) "" else "display:none;",
     div(
-      class = "col-auto text-muted",
-      style = "min-width:28px; font-size:.8rem; text-align:right;",
-      pos
-    ),
-    div(
-      class = "col-4 col-sm-3 col-md-2",
+      class = "col-3",
       textInput(
         paste0("gm_x_", id),
         NULL,
@@ -138,12 +230,13 @@ grim_row_ui <- function(id, pos) {
         placeholder = "e.g. 5.23"
       )
     ),
+    div(class = "col-auto", dp_input(paste0("gm_dp_", id))),
     div(
-      class = "col-4 col-sm-3 col-md-2",
+      class = "col-auto",
       textInput(
         paste0("gm_n_", id),
         NULL,
-        width = "100%",
+        width = "110px",
         placeholder = "e.g. 30"
       )
     ),
@@ -155,16 +248,13 @@ grim_row_ui <- function(id, pos) {
   )
 }
 
-grimmer_row_ui <- function(id, pos) {
+grimmer_row <- function(id) {
   div(
+    id = paste0("grimmer_slot_", id),
     class = "row g-2 align-items-center mb-1",
+    style = if (id <= 3) "" else "display:none;",
     div(
-      class = "col-auto text-muted",
-      style = "min-width:28px; font-size:.8rem; text-align:right;",
-      pos
-    ),
-    div(
-      class = "col-3 col-md-2",
+      class = "col",
       textInput(
         paste0("gr_x_", id),
         NULL,
@@ -172,8 +262,9 @@ grimmer_row_ui <- function(id, pos) {
         placeholder = "e.g. 5.23"
       )
     ),
+    div(class = "col-auto", dp_input(paste0("gr_dp_x_", id))),
     div(
-      class = "col-3 col-md-2",
+      class = "col",
       textInput(
         paste0("gr_sd_", id),
         NULL,
@@ -181,12 +272,13 @@ grimmer_row_ui <- function(id, pos) {
         placeholder = "e.g. 1.11"
       )
     ),
+    div(class = "col-auto", dp_input(paste0("gr_dp_sd_", id))),
     div(
-      class = "col-3 col-md-2",
+      class = "col-auto",
       textInput(
         paste0("gr_n_", id),
         NULL,
-        width = "100%",
+        width = "110px",
         placeholder = "e.g. 30"
       )
     ),
@@ -199,28 +291,37 @@ grimmer_row_ui <- function(id, pos) {
 }
 
 # ── column headers ────────────────────────────────────────────────────────────
+# col-auto header cells wrap a fixed-width inner div matching the input width,
+# so they align with col-auto data cells regardless of Bootstrap gutter.
 
 hdr_style <- "min-height:36px; font-size:.8rem; font-weight:600; color:#868e96; text-transform:uppercase; letter-spacing:.05em;"
+dp_hdr <- div(
+  style = "width:80px; padding-left:2px; white-space:nowrap;",
+  "Decimals"
+)
+n_hdr <- div(
+  style = "width:110px; padding-left:2px; white-space:nowrap; text-transform:none; letter-spacing:0;",
+  "Sample size (N)"
+)
 
 grim_header <- div(
   class = "row g-2 align-items-end mb-0",
   style = hdr_style,
-  div(class = "col-auto", style = "min-width:28px;"),
-  div(class = "col-4 col-sm-3 col-md-2 ps-2", "Mean"),
-  div(class = "col-4 col-sm-3 col-md-2 ps-2", "Sample size (n)"),
-  div(class = "col ps-2", "Result"),
-  div(class = "col-auto", style = "width:30px;")
+  div(class = "col-3 ps-2", "Mean"),
+  div(class = "col-auto", dp_hdr),
+  div(class = "col-auto", n_hdr),
+  div(class = "col ps-2", "Result")
 )
 
 grimmer_header <- div(
   class = "row g-2 align-items-end mb-0",
   style = hdr_style,
-  div(class = "col-auto", style = "min-width:28px;"),
-  div(class = "col-3 col-md-2 ps-2", "Mean"),
-  div(class = "col-3 col-md-2 ps-2", "SD"),
-  div(class = "col-3 col-md-2 ps-2", "Sample size (n)"),
-  div(class = "col ps-2", "Result"),
-  div(class = "col-auto", style = "width:30px;")
+  div(class = "col ps-2", "Mean"),
+  div(class = "col-auto", dp_hdr),
+  div(class = "col ps-2", "SD"),
+  div(class = "col-auto", dp_hdr),
+  div(class = "col-auto", n_hdr),
+  div(class = "col ps-2", "Result")
 )
 
 # ── custom CSS ────────────────────────────────────────────────────────────────
@@ -228,7 +329,9 @@ grimmer_header <- div(
 custom_css <- tags$style(HTML(
   "
   body { background-color: #f8f9fa; }
-  .navbar-brand { font-weight: 700; letter-spacing: -.02em; }
+  .navbar { --bs-navbar-padding-y: 0px; padding-top: 0 !important; padding-bottom: 0 !important; }
+  .navbar-brand { font-weight: 700; letter-spacing: -.02em; --bs-navbar-brand-padding-y: 0px; padding-top: 0 !important; padding-bottom: 0 !important; }
+  .navbar-nav { align-items: center !important; }
   .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
   .card-header { background: white; border-bottom: 1px solid #e9ecef; font-weight: 600; font-size: 1rem; }
   .form-control { border-color: #dee2e6; font-size: .9rem; }
@@ -240,13 +343,21 @@ custom_css <- tags$style(HTML(
   .bg-danger  { background-color: #fa5252 !important; }
   .shiny-input-container { margin-bottom: 0; }
   ::placeholder { color: #adb5bd !important; font-style: italic; }
+  .rm-btn { background: transparent !important; border: none !important; opacity: 1 !important; }
+  .rm-btn img { opacity: 1 !important; filter: none; }
+  .rm-btn:hover { background-color: #fa5252 !important; border-radius: 4px; }
+  .rm-btn:hover img { filter: brightness(0) invert(1) !important; }
 "
 ))
 
 # ── UI ───────────────────────────────────────────────────────────────────────
 
 ui <- page_navbar(
-  title = "GRIM & GRIMMER Tester",
+  title = div(
+    class = "d-flex align-items-center gap-2",
+    tags$img(src = "images/inspect-sr.png", height = "56px", alt = "scrutiny"),
+    "GRIM & GRIMMER Tester"
+  ),
   theme = bs_theme(
     bootswatch = "flatly",
     primary = "#2c7be5",
@@ -262,7 +373,7 @@ ui <- page_navbar(
     "GRIM",
     div(
       class = "container py-4",
-      style = "max-width:680px;",
+      style = "max-width:720px;",
       card(
         card_header("GRIM Test"),
         card_body(
@@ -270,12 +381,17 @@ ui <- page_navbar(
             class = "text-muted mb-3",
             "GRIM (Granularity-Related Inconsistency of Means) checks whether a ",
             "reported mean is arithmetically possible given the sample size. ",
-            "Enter each mean exactly as it appears in the paper ",
+            "Enter each mean exactly as it appears in the paper. ",
+            "Set ",
+            tags$em("Decimals"),
+            " to the number of decimal places it was reported to ",
             tags$em("(trailing zeros matter: 5.20 ≠ 5.2)"),
             "."
           ),
           grim_header,
-          uiOutput("grim_rows"),
+          tagList(lapply(seq_len(MAX_ROWS), grim_row)),
+          uiOutput("grim_empty"),
+          uiOutput("grim_vis"),
           div(
             class = "mt-3",
             actionButton(
@@ -295,7 +411,7 @@ ui <- page_navbar(
     "GRIMMER",
     div(
       class = "container py-4",
-      style = "max-width:820px;",
+      style = "max-width:900px;",
       card(
         card_header("GRIMMER Test"),
         card_body(
@@ -303,12 +419,15 @@ ui <- page_navbar(
             class = "text-muted mb-3",
             "GRIMMER extends GRIM to also check whether a reported standard deviation (SD) ",
             "is consistent with the mean and sample size. ",
-            "Enter all values exactly as reported ",
-            tags$em("(trailing zeros matter)"),
-            "."
+            "Set ",
+            tags$em("Decimals"),
+            " for both the mean and the SD to the number of ",
+            "decimal places each was reported to."
           ),
           grimmer_header,
-          uiOutput("grimmer_rows"),
+          tagList(lapply(seq_len(MAX_ROWS), grimmer_row)),
+          uiOutput("grimmer_empty"),
+          uiOutput("grimmer_vis"),
           div(
             class = "mt-3",
             actionButton(
@@ -330,47 +449,47 @@ server <- function(input, output, session) {
   grim_slots <- reactiveVal(1:3)
   grimmer_slots <- reactiveVal(1:3)
 
-  output$grim_rows <- renderUI({
-    slots <- grim_slots()
-    if (length(slots) == 0) {
-      return(p(
-        class = "text-muted fst-italic small mt-2 mb-0",
-        "No rows. Click '+ Add row' to add one."
-      ))
-    }
-    mapply(grim_row_ui, id = slots, pos = seq_along(slots), SIMPLIFY = FALSE)
-  })
+  vis_css <- function(slots, prefix) {
+    rules <- vapply(
+      seq_len(MAX_ROWS),
+      function(i) {
+        display <- if (i %in% slots) "flex" else "none"
+        sprintf("#%s_slot_%d{display:%s!important}", prefix, i, display)
+      },
+      character(1)
+    )
+    tags$style(paste(rules, collapse = ""))
+  }
 
-  output$grimmer_rows <- renderUI({
-    slots <- grimmer_slots()
-    if (length(slots) == 0) {
-      return(p(
+  output$grim_vis <- renderUI(vis_css(grim_slots(), "grim"))
+  output$grimmer_vis <- renderUI(vis_css(grimmer_slots(), "grimmer"))
+
+  output$grim_empty <- renderUI({
+    if (length(grim_slots()) == 0) {
+      p(
         class = "text-muted fst-italic small mt-2 mb-0",
         "No rows. Click '+ Add row' to add one."
-      ))
+      )
     }
-    mapply(grimmer_row_ui, id = slots, pos = seq_along(slots), SIMPLIFY = FALSE)
+  })
+  output$grimmer_empty <- renderUI({
+    if (length(grimmer_slots()) == 0) {
+      p(
+        class = "text-muted fst-italic small mt-2 mb-0",
+        "No rows. Click '+ Add row' to add one."
+      )
+    }
   })
 
   observeEvent(input$grim_add, {
     slots <- grim_slots()
     ns <- next_free(slots)
-    if (!is.null(ns)) {
-      updateTextInput(session, paste0("gm_x_", ns), value = "")
-      updateTextInput(session, paste0("gm_n_", ns), value = "")
-      grim_slots(c(slots, ns))
-    }
+    if (!is.null(ns)) grim_slots(c(slots, ns))
   })
-
   observeEvent(input$grimmer_add, {
     slots <- grimmer_slots()
     ns <- next_free(slots)
-    if (!is.null(ns)) {
-      updateTextInput(session, paste0("gr_x_", ns), value = "")
-      updateTextInput(session, paste0("gr_sd_", ns), value = "")
-      updateTextInput(session, paste0("gr_n_", ns), value = "")
-      grimmer_slots(c(slots, ns))
-    }
+    if (!is.null(ns)) grimmer_slots(c(slots, ns))
   })
 
   # Pre-register outputs and remove observers for every possible slot
@@ -381,7 +500,13 @@ server <- function(input, output, session) {
       observeEvent(
         input[[paste0("gm_rm_", ii)]],
         {
-          grim_slots(setdiff(grim_slots(), ii))
+          current <- grim_slots()
+          if (ii %in% current) {
+            updateTextInput(session, paste0("gm_x_", ii), value = "")
+            updateTextInput(session, paste0("gm_n_", ii), value = "")
+            updateNumericInput(session, paste0("gm_dp_", ii), value = 2)
+            grim_slots(setdiff(current, ii))
+          }
         },
         ignoreNULL = TRUE,
         ignoreInit = TRUE
@@ -390,7 +515,15 @@ server <- function(input, output, session) {
       observeEvent(
         input[[paste0("gr_rm_", ii)]],
         {
-          grimmer_slots(setdiff(grimmer_slots(), ii))
+          current <- grimmer_slots()
+          if (ii %in% current) {
+            updateTextInput(session, paste0("gr_x_", ii), value = "")
+            updateTextInput(session, paste0("gr_sd_", ii), value = "")
+            updateTextInput(session, paste0("gr_n_", ii), value = "")
+            updateNumericInput(session, paste0("gr_dp_x_", ii), value = 2)
+            updateNumericInput(session, paste0("gr_dp_sd_", ii), value = 2)
+            grimmer_slots(setdiff(current, ii))
+          }
         },
         ignoreNULL = TRUE,
         ignoreInit = TRUE
@@ -399,20 +532,31 @@ server <- function(input, output, session) {
       output[[paste0("gm_badge_", ii)]] <- renderUI({
         x_str <- input[[paste0("gm_x_", ii)]]
         n_str <- input[[paste0("gm_n_", ii)]]
+        dp <- input[[paste0("gm_dp_", ii)]]
         if (is.null(x_str) || !nzchar(trimws(x_str))) {
           return(NULL)
         }
-        result_ui(safe_grim(x_str, n_str))
+        err <- validate_grim_row(x_str, n_str, dp)
+        if (!is.null(err)) {
+          return(error_ui(err))
+        }
+        result_ui(safe_grim(x_str, n_str, dp))
       })
 
       output[[paste0("gr_badge_", ii)]] <- renderUI({
         x_str <- input[[paste0("gr_x_", ii)]]
         sd_str <- input[[paste0("gr_sd_", ii)]]
         n_str <- input[[paste0("gr_n_", ii)]]
+        dp_x <- input[[paste0("gr_dp_x_", ii)]]
+        dp_sd <- input[[paste0("gr_dp_sd_", ii)]]
         if (is.null(x_str) || !nzchar(trimws(x_str))) {
           return(NULL)
         }
-        res <- safe_grimmer(x_str, sd_str, n_str)
+        err <- validate_grimmer_row(x_str, sd_str, n_str, dp_x, dp_sd)
+        if (!is.null(err)) {
+          return(error_ui(err))
+        }
+        res <- safe_grimmer(x_str, sd_str, n_str, dp_x, dp_sd)
         result_ui(res$ok, res$reason)
       })
     })
@@ -425,10 +569,14 @@ server <- function(input, output, session) {
       function(i) {
         x_str <- input[[paste0("gm_x_", i)]]
         n_str <- input[[paste0("gm_n_", i)]]
+        dp <- input[[paste0("gm_dp_", i)]]
         if (is.null(x_str) || !nzchar(trimws(x_str))) {
           return(NA)
         }
-        safe_grim(x_str, n_str)
+        if (!is.null(validate_grim_row(x_str, n_str, dp))) {
+          return(NA)
+        }
+        safe_grim(x_str, n_str, dp)
       },
       logical(1)
     )
@@ -443,10 +591,15 @@ server <- function(input, output, session) {
         x_str <- input[[paste0("gr_x_", i)]]
         sd_str <- input[[paste0("gr_sd_", i)]]
         n_str <- input[[paste0("gr_n_", i)]]
+        dp_x <- input[[paste0("gr_dp_x_", i)]]
+        dp_sd <- input[[paste0("gr_dp_sd_", i)]]
         if (is.null(x_str) || !nzchar(trimws(x_str))) {
           return(NA)
         }
-        safe_grimmer(x_str, sd_str, n_str)$ok
+        if (!is.null(validate_grimmer_row(x_str, sd_str, n_str, dp_x, dp_sd))) {
+          return(NA)
+        }
+        safe_grimmer(x_str, sd_str, n_str, dp_x, dp_sd)$ok
       },
       logical(1)
     )
