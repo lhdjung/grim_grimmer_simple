@@ -503,6 +503,45 @@ ui <- page_navbar(
         )
       )
     )
+  ),
+
+  nav_panel(
+    "About",
+    div(
+      class = "container py-4",
+      style = "max-width:900px;",
+      card(
+        card_header("About"),
+        card_body(
+          p(
+            class = "text-muted mb-3",
+            "GRIM and GRIMMER represent",
+            a(
+              "INSPECT-SR check 4.8",
+              href = "https://inspect.sr/chapters/check_4_8.html",
+              .noWS = "after"
+            ),
+            ". INSPECT-SR (",
+            a(
+              "Wilkinson et al., 2025",
+              href = "https://www.medrxiv.org/content/10.1101/2025.09.03.25334905v3",
+              .noWS = "outside"
+            ),
+            ") is a framework for assessing the trustworthiness of",
+            "randomised controlled trials in systematic reviews. However, it",
+            "can be applied to other fields, as well.",
+            br(),
+            br(),
+            "Shiny app made by Lukas Jung, University of Bern, using the",
+            a(
+              "scrutiny",
+              href = "https://lhdjung.github.io/scrutiny/"
+            ),
+            "package for error detection in science."
+          )
+        )
+      )
+    )
   )
 )
 
