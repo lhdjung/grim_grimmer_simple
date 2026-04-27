@@ -368,7 +368,9 @@ custom_css <- tags$style(HTML(
     min-height: 56px;
   }
   .navbar-brand {
-    padding: 0 !important;
+    padding: 0 1rem 0 0 !important;
+    margin-right: .5rem !important;
+    border-right: 5px solid rgba(255,255,255,.25);
     align-self: stretch;
     display: flex !important;
     align-items: center !important;
