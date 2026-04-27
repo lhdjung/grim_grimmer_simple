@@ -70,6 +70,20 @@ friendly_reason <- function(reason) {
   reason
 }
 
+short_reason <- function(reason) {
+  if (reason == "GRIM inconsistent") {
+    return("GRIM")
+  }
+  if (grepl("GRIMMER inconsistent", reason)) {
+    m <- regmatches(reason, regexpr("\\(test \\d+\\)", reason))
+    if (length(m) > 0 && nzchar(m)) {
+      return(paste0("GRIMMER ", m))
+    }
+    return("GRIMMER")
+  }
+  reason
+}
+
 # ── validation ────────────────────────────────────────────────────────────────
 
 # Returns an error string, or NULL if all inputs are valid / not yet entered.
@@ -155,15 +169,26 @@ result_ui <- function(ok, reason = NULL) {
       HTML("&#10003;&nbsp; Consistent")
     )
   } else {
-    span(
-      class = "badge rounded-pill bg-danger px-3 py-2",
-      title = if (!is.null(reason) && nzchar(reason)) {
-        friendly_reason(reason)
-      } else {
-        NULL
-      },
-      HTML("&#10007;&nbsp; Inconsistent")
-    )
+    short <- if (!is.null(reason) && nzchar(reason)) {
+      short_reason(reason)
+    } else {
+      NULL
+    }
+    if (!is.null(short)) {
+      div(
+        class = "d-flex flex-column align-items-start gap-1",
+        span(
+          class = "badge rounded-pill bg-danger px-3 py-2",
+          HTML("&#10007;&nbsp; Inconsistent")
+        ),
+        span(class = "text-danger", style = "font-size:.75rem;", short)
+      )
+    } else {
+      span(
+        class = "badge rounded-pill bg-danger px-3 py-2",
+        HTML("&#10007;&nbsp; Inconsistent")
+      )
+    }
   }
 }
 
@@ -329,9 +354,39 @@ grimmer_header <- div(
 custom_css <- tags$style(HTML(
   "
   body { background-color: #f8f9fa; }
-  .navbar { --bs-navbar-padding-y: 0px; padding-top: 0 !important; padding-bottom: 0 !important; }
-  .navbar-brand { font-weight: 700; letter-spacing: -.02em; --bs-navbar-brand-padding-y: 0px; padding-top: 0 !important; padding-bottom: 0 !important; }
-  .navbar-nav { align-items: center !important; }
+
+  /* ── navbar ─────────────────────────────────────────────────────────── */
+  nav.navbar {
+    min-height: 56px;
+  }
+  nav.navbar > .container-fluid {
+    align-items: center !important;
+    min-height: 56px;
+  }
+  .navbar-brand {
+    padding: 0 !important;
+    align-self: stretch;
+    display: flex !important;
+    align-items: center !important;
+    font-weight: 700;
+    letter-spacing: -.02em;
+  }
+  .navbar-brand img {
+    display: block;
+    height: 56px;
+    width: auto;
+  }
+  nav.navbar .navbar-nav {
+    align-items: center !important;
+    margin: 0 !important;
+  }
+  nav.navbar .nav-link {
+    border-bottom: none !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* ── cards & inputs ─────────────────────────────────────────────────── */
   .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
   .card-header { background: white; border-bottom: 1px solid #e9ecef; font-weight: 600; font-size: 1rem; }
   .form-control { border-color: #dee2e6; font-size: .9rem; }
@@ -355,18 +410,24 @@ custom_css <- tags$style(HTML(
 ui <- page_navbar(
   title = div(
     class = "d-flex align-items-center gap-2",
-    tags$img(src = "images/inspect-sr.png", height = "56px", alt = "scrutiny"),
+    tags$img(
+      src = "images/inspect-sr.png",
+      alt = "scrutiny",
+      height = "56"
+    ),
     "GRIM & GRIMMER Tester"
   ),
   theme = bs_theme(
     bootswatch = "flatly",
     primary = "#2c7be5",
     "navbar-bg" = "#1e3a5f",
+    "navbar-padding-y" = "0",
+    "navbar-brand-padding-y" = "0",
     base_font = font_google("Inter"),
     heading_font = font_google("Inter")
   ),
   navbar_options = navbar_options(bg = "#1e3a5f", underline = FALSE),
-  header = custom_css,
+  header = tagList(custom_css),
 
   # ── GRIM tab ───────────────────────────────────────────────────────────────
   nav_panel(
