@@ -15,22 +15,28 @@ parse_num <- function(s) {
   suppressWarnings(as.numeric(gsub(",", ".", trimws(s))))
 }
 
-safe_grim <- function(x_str, n_str, digits_x) {
+safe_grim <- function(x_str, n_str, digits_x, items) {
   x <- parse_num(x_str)
   n <- suppressWarnings(as.integer(parse_num(n_str)))
   dx <- suppressWarnings(as.integer(digits_x))
-  if (is.na(x) || is.na(n) || n < 2 || is.na(dx) || dx < 0) {
+  it <- suppressWarnings(as.integer(items))
+  if (
+    is.na(x) || is.na(n) || n < 2 || is.na(dx) || dx < 0 || is.na(it) || it < 1
+  ) {
     return(NA)
   }
-  tryCatch(grim(x = x, n = n, digits_x = dx), error = function(e) NA)
+  tryCatch(grim(x = x, n = n, digits_x = dx, items = it), error = function(e) {
+    NA
+  })
 }
 
-safe_grimmer <- function(x_str, sd_str, n_str, digits_x, digits_sd) {
+safe_grimmer <- function(x_str, sd_str, n_str, digits_x, digits_sd, items) {
   x <- parse_num(x_str)
   sd <- parse_num(sd_str)
   n <- suppressWarnings(as.integer(parse_num(n_str)))
   dx <- suppressWarnings(as.integer(digits_x))
   ds <- suppressWarnings(as.integer(digits_sd))
+  it <- suppressWarnings(as.integer(items))
   if (
     is.na(x) ||
       is.na(sd) ||
@@ -39,7 +45,9 @@ safe_grimmer <- function(x_str, sd_str, n_str, digits_x, digits_sd) {
       is.na(dx) ||
       dx < 0 ||
       is.na(ds) ||
-      ds < 0
+      ds < 0 ||
+      is.na(it) ||
+      it < 1
   ) {
     return(list(ok = NA, reason = ""))
   }
@@ -50,6 +58,7 @@ safe_grimmer <- function(x_str, sd_str, n_str, digits_x, digits_sd) {
       n = n,
       digits_x = dx,
       digits_sd = ds,
+      items = it,
       show_reason = TRUE
     ),
     error = function(e) NULL
@@ -87,7 +96,7 @@ short_reason <- function(reason) {
 # ── validation ────────────────────────────────────────────────────────────────
 
 # Returns an error string, or NULL if all inputs are valid / not yet entered.
-validate_grim_row <- function(x_str, n_str, dp_x) {
+validate_grim_row <- function(x_str, n_str, dp_x, items) {
   if (!is.null(x_str) && nzchar(trimws(x_str))) {
     if (is.na(parse_num(x_str))) {
       return("Mean must be a number")
@@ -118,11 +127,16 @@ validate_grim_row <- function(x_str, n_str, dp_x) {
     }
     if (n_num < 2) return("N must be at least 2")
   }
+  if (!is.null(items) && !is.na(items)) {
+    if (items != round(items) || items < 1) {
+      return("Items must be a positive whole number")
+    }
+  }
   NULL
 }
 
-validate_grimmer_row <- function(x_str, sd_str, n_str, dp_x, dp_sd) {
-  err <- validate_grim_row(x_str, n_str, dp_x)
+validate_grimmer_row <- function(x_str, sd_str, n_str, dp_x, dp_sd, items) {
+  err <- validate_grim_row(x_str, n_str, dp_x, items)
   if (!is.null(err)) {
     return(err)
   }
@@ -245,6 +259,10 @@ dp_input <- function(id) {
   numericInput(id, NULL, value = 2, min = 0, max = 10, step = 1, width = "80px")
 }
 
+items_input <- function(id) {
+  numericInput(id, NULL, value = 1, min = 1, step = 1, width = "70px")
+}
+
 grim_row <- function(id) {
   div(
     id = paste0("grim_slot_", id),
@@ -269,6 +287,7 @@ grim_row <- function(id) {
         placeholder = "e.g. 30"
       )
     ),
+    div(class = "col-auto", items_input(paste0("gm_items_", id))),
     div(
       class = "col d-flex align-items-center",
       uiOutput(paste0("gm_badge_", id))
@@ -311,6 +330,7 @@ grimmer_row <- function(id) {
         placeholder = "e.g. 30"
       )
     ),
+    div(class = "col-auto", items_input(paste0("gr_items_", id))),
     div(
       class = "col d-flex align-items-center",
       uiOutput(paste0("gr_badge_", id))
@@ -332,6 +352,10 @@ n_hdr <- div(
   style = "width:110px; padding-left:2px; white-space:nowrap; text-transform:none; letter-spacing:0;",
   "SAMPLE SIZE (N)"
 )
+items_hdr <- div(
+  style = "width:70px; padding-left:2px; white-space:nowrap;",
+  "Items"
+)
 
 grim_header <- div(
   class = "row g-2 align-items-end mb-0",
@@ -339,6 +363,7 @@ grim_header <- div(
   div(class = "col-3 ps-2", "Mean"),
   div(class = "col-auto", dp_hdr),
   div(class = "col-auto", n_hdr),
+  div(class = "col-auto", items_hdr),
   div(class = "col ps-2", "Result")
 )
 
@@ -350,6 +375,7 @@ grimmer_header <- div(
   div(class = "col ps-2", "SD"),
   div(class = "col-auto", dp_hdr),
   div(class = "col-auto", n_hdr),
+  div(class = "col-auto", items_hdr),
   div(class = "col ps-2", "Result")
 )
 
@@ -449,7 +475,8 @@ ui <- page_navbar(
             br(), br(), "Set ", tags$em("Decimals"),
             " to the number of decimal places to which the mean was reported.",
             "This is needed because trailing zeros matter for granularity:",
-            tags$em("5.20 ≠ 5.2")
+            tags$em("5.20 ≠ 5.2"), ". Multi-item / mean-scored measures",
+            "require the number of items in", tags$em("Items.")
           ),
           grim_header,
           tagList(lapply(seq_len(MAX_ROWS), grim_row)),
@@ -485,7 +512,9 @@ ui <- page_navbar(
             "deviation (SD) is consistent with the mean and sample size. ",
             tags$em("Result"), "shows the reason for any inconsistencies.",
             br(), br(),  "Set ", tags$em("Decimals"),
-            " for mean and SD to the number of decimal places they were reported to."
+            " for mean and SD to the number of decimal places they were",
+            "reported to. Multi-item / mean-scored measures require the number",
+            "of items in", tags$em("Items.")
           ),
           grimmer_header,
           tagList(lapply(seq_len(MAX_ROWS), grimmer_row)),
@@ -607,6 +636,7 @@ server <- function(input, output, session) {
             updateTextInput(session, paste0("gm_x_", ii), value = "")
             updateTextInput(session, paste0("gm_n_", ii), value = "")
             updateNumericInput(session, paste0("gm_dp_", ii), value = 2)
+            updateNumericInput(session, paste0("gm_items_", ii), value = 1)
             grim_slots(setdiff(current, ii))
           }
         },
@@ -624,6 +654,7 @@ server <- function(input, output, session) {
             updateTextInput(session, paste0("gr_n_", ii), value = "")
             updateNumericInput(session, paste0("gr_dp_x_", ii), value = 2)
             updateNumericInput(session, paste0("gr_dp_sd_", ii), value = 2)
+            updateNumericInput(session, paste0("gr_items_", ii), value = 1)
             grimmer_slots(setdiff(current, ii))
           }
         },
@@ -635,14 +666,15 @@ server <- function(input, output, session) {
         x_str <- input[[paste0("gm_x_", ii)]]
         n_str <- input[[paste0("gm_n_", ii)]]
         dp <- input[[paste0("gm_dp_", ii)]]
+        items <- input[[paste0("gm_items_", ii)]]
         if (is.null(x_str) || !nzchar(trimws(x_str))) {
           return(NULL)
         }
-        err <- validate_grim_row(x_str, n_str, dp)
+        err <- validate_grim_row(x_str, n_str, dp, items)
         if (!is.null(err)) {
           return(error_ui(err))
         }
-        result_ui(safe_grim(x_str, n_str, dp))
+        result_ui(safe_grim(x_str, n_str, dp, items))
       })
 
       output[[paste0("gr_badge_", ii)]] <- renderUI({
@@ -651,14 +683,15 @@ server <- function(input, output, session) {
         n_str <- input[[paste0("gr_n_", ii)]]
         dp_x <- input[[paste0("gr_dp_x_", ii)]]
         dp_sd <- input[[paste0("gr_dp_sd_", ii)]]
+        items <- input[[paste0("gr_items_", ii)]]
         if (is.null(x_str) || !nzchar(trimws(x_str))) {
           return(NULL)
         }
-        err <- validate_grimmer_row(x_str, sd_str, n_str, dp_x, dp_sd)
+        err <- validate_grimmer_row(x_str, sd_str, n_str, dp_x, dp_sd, items)
         if (!is.null(err)) {
           return(error_ui(err))
         }
-        res <- safe_grimmer(x_str, sd_str, n_str, dp_x, dp_sd)
+        res <- safe_grimmer(x_str, sd_str, n_str, dp_x, dp_sd, items)
         result_ui(res$ok, res$reason)
       })
     })
@@ -672,13 +705,14 @@ server <- function(input, output, session) {
         x_str <- input[[paste0("gm_x_", i)]]
         n_str <- input[[paste0("gm_n_", i)]]
         dp <- input[[paste0("gm_dp_", i)]]
+        items <- input[[paste0("gm_items_", i)]]
         if (is.null(x_str) || !nzchar(trimws(x_str))) {
           return(NA)
         }
-        if (!is.null(validate_grim_row(x_str, n_str, dp))) {
+        if (!is.null(validate_grim_row(x_str, n_str, dp, items))) {
           return(NA)
         }
-        safe_grim(x_str, n_str, dp)
+        safe_grim(x_str, n_str, dp, items)
       },
       logical(1)
     )
@@ -695,13 +729,23 @@ server <- function(input, output, session) {
         n_str <- input[[paste0("gr_n_", i)]]
         dp_x <- input[[paste0("gr_dp_x_", i)]]
         dp_sd <- input[[paste0("gr_dp_sd_", i)]]
+        items <- input[[paste0("gr_items_", i)]]
         if (is.null(x_str) || !nzchar(trimws(x_str))) {
           return(NA)
         }
-        if (!is.null(validate_grimmer_row(x_str, sd_str, n_str, dp_x, dp_sd))) {
+        if (
+          !is.null(validate_grimmer_row(
+            x_str,
+            sd_str,
+            n_str,
+            dp_x,
+            dp_sd,
+            items
+          ))
+        ) {
           return(NA)
         }
-        safe_grimmer(x_str, sd_str, n_str, dp_x, dp_sd)$ok
+        safe_grimmer(x_str, sd_str, n_str, dp_x, dp_sd, items)$ok
       },
       logical(1)
     )
