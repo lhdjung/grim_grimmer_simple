@@ -6,14 +6,6 @@ MAX_ROWS <- 15
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-count_decimals <- function(s) {
-  if (is.null(s) || !nzchar(trimws(s))) {
-    return(0L)
-  }
-  s <- trimws(gsub(",", ".", s))
-  if (grepl("\\.", s)) nchar(sub(".*\\.", "", s)) else 0L
-}
-
 parse_num <- function(s) {
   if (is.null(s) || !nzchar(trimws(s))) {
     return(NA_real_)
@@ -28,7 +20,7 @@ safe_grim <- function(x_str, n_str) {
     return(NA)
   }
   tryCatch(
-    grim(x = x, n = n, digits_x = count_decimals(x_str)),
+    grim(x = x, n = n, digits_x = decimal_places_scalar(x_str)),
     error = function(e) NA
   )
 }
@@ -45,8 +37,8 @@ safe_grimmer <- function(x_str, sd_str, n_str) {
       x = x,
       sd = sd,
       n = n,
-      digits_x = count_decimals(x_str),
-      digits_sd = count_decimals(sd_str),
+      digits_x = decimal_places_scalar(x_str),
+      digits_sd = decimal_places_scalar(sd_str),
       show_reason = TRUE
     ),
     error = function(e) NULL
