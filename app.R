@@ -75,9 +75,9 @@ short_reason <- function(reason) {
     return("GRIM")
   }
   if (grepl("GRIMMER inconsistent", reason)) {
-    m <- regmatches(reason, regexpr("\\(test \\d+\\)", reason))
+    m <- regmatches(reason, regexpr("\\d+", reason))
     if (length(m) > 0 && nzchar(m)) {
-      return(paste0("GRIMMER ", m))
+      return(paste0("test ", m))
     }
     return("GRIMMER")
   }
@@ -176,12 +176,16 @@ result_ui <- function(ok, reason = NULL) {
     }
     if (!is.null(short)) {
       div(
-        class = "d-flex flex-column align-items-start gap-1",
+        class = "d-flex align-items-center gap-2",
         span(
           class = "badge rounded-pill bg-danger px-3 py-2",
           HTML("&#10007;&nbsp; Inconsistent")
         ),
-        span(class = "text-danger", style = "font-size:.75rem;", short)
+        span(
+          class = "text-danger",
+          style = "font-size:.75rem; white-space:nowrap;",
+          short
+        )
       )
     } else {
       span(
@@ -378,12 +382,9 @@ custom_css <- tags$style(HTML(
   }
   nav.navbar .navbar-nav {
     align-items: center !important;
-    margin: 0 !important;
   }
   nav.navbar .nav-link {
     border-bottom: none !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
   }
 
   /* ── cards & inputs ─────────────────────────────────────────────────── */
