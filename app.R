@@ -77,7 +77,7 @@ short_reason <- function(reason) {
   if (grepl("GRIMMER inconsistent", reason)) {
     m <- regmatches(reason, regexpr("\\d+", reason))
     if (length(m) > 0 && nzchar(m)) {
-      return(paste0("test ", m))
+      return(paste0("Test ", m))
     }
     return("GRIMMER")
   }
@@ -330,7 +330,7 @@ dp_hdr <- div(
 )
 n_hdr <- div(
   style = "width:110px; padding-left:2px; white-space:nowrap; text-transform:none; letter-spacing:0;",
-  "Sample size (N)"
+  "SAMPLE SIZE (N)"
 )
 
 grim_header <- div(
@@ -441,16 +441,15 @@ ui <- page_navbar(
       card(
         card_header("GRIM Test"),
         card_body(
+          # fmt: skip
           p(
             class = "text-muted mb-3",
-            "GRIM (Granularity-Related Inconsistency of Means) checks whether a ",
+            "GRIM (granularity-related inconsistency of means) checks whether a ",
             "reported mean is arithmetically possible given the sample size. ",
-            "Enter each mean exactly as it appears in the paper. ",
-            "Set ",
-            tags$em("Decimals"),
-            " to the number of decimal places it was reported to ",
-            tags$em("(trailing zeros matter: 5.20 ≠ 5.2)"),
-            "."
+            br(), br(), "Set ", tags$em("Decimals"),
+            " to the number of decimal places to which the mean was reported.",
+            "This is needed because trailing zeros matter for granularity:",
+            tags$em("5.20 ≠ 5.2")
           ),
           grim_header,
           tagList(lapply(seq_len(MAX_ROWS), grim_row)),
@@ -479,14 +478,14 @@ ui <- page_navbar(
       card(
         card_header("GRIMMER Test"),
         card_body(
+          # fmt: skip
           p(
             class = "text-muted mb-3",
-            "GRIMMER extends GRIM to also check whether a reported standard deviation (SD) ",
-            "is consistent with the mean and sample size. ",
-            "Set ",
-            tags$em("Decimals"),
-            " for both the mean and the SD to the number of ",
-            "decimal places each was reported to."
+            "GRIMMER extends GRIM to also check whether a reported standard ",
+            "deviation (SD) is consistent with the mean and sample size. ",
+            tags$em("Result"), "shows the reason for any inconsistencies.",
+            br(), br(),  "Set ", tags$em("Decimals"),
+            " for mean and SD to the number of decimal places they were reported to."
           ),
           grimmer_header,
           tagList(lapply(seq_len(MAX_ROWS), grimmer_row)),
