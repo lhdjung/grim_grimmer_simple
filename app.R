@@ -98,7 +98,7 @@ validate_grim_row <- function(x_str, n_str, dp_x, items) {
       actual <- decimal_places_scalar(x_str)
       if (dp_int < actual) {
         return(sprintf(
-          "Mean has %d decimal place%s but d.p. is set to %d",
+          "Mean has %d decimal place%s but Decimals is set to %d",
           actual,
           if (actual == 1L) "" else "s",
           dp_int
@@ -141,7 +141,7 @@ validate_grimmer_row <- function(x_str, sd_str, n_str, dp_x, dp_sd, items) {
       actual <- decimal_places_scalar(sd_str)
       if (dp_int < actual) {
         return(sprintf(
-          "SD has %d decimal place%s but d.p. is set to %d",
+          "SD has %d decimal place%s but Decimals is set to %d",
           actual,
           if (actual == 1L) "" else "s",
           dp_int
@@ -524,7 +524,7 @@ ui <- page_navbar(
             class = "text-muted mb-3",
             "GRIMMER extends GRIM to also check whether a reported standard ",
             "deviation (SD) is consistent with the mean and sample size. ",
-            tags$em("Result"), "shows the reason for any inconsistencies.",
+            tags$em("Result"), "includes the reason for any inconsistencies.",
             br(), br(),  "Set ", tags$em("Decimals"),
             " for mean and SD to the number of decimal places they were",
             "reported to. Multi-item / mean-scored measures require the number",
