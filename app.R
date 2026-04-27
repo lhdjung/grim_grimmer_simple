@@ -256,20 +256,19 @@ rm_btn <- function(id) {
 
 # numericInput for decimal places (shared by GRIM and GRIMMER rows)
 dp_input <- function(id) {
-  numericInput(id, NULL, value = 2, min = 0, max = 10, step = 1, width = "80px")
+  numericInput(id, NULL, value = 2, min = 0, max = 10, step = 1, width = "100%")
 }
 
 items_input <- function(id) {
-  numericInput(id, NULL, value = 1, min = 1, step = 1, width = "70px")
+  numericInput(id, NULL, value = 1, min = 1, step = 1, width = "100%")
 }
 
 grim_row <- function(id) {
   div(
     id = paste0("grim_slot_", id),
-    class = "row g-2 align-items-center mb-1",
     style = if (id <= 3) "" else "display:none;",
     div(
-      class = "col-3",
+      class = "grid-cell",
       textInput(
         paste0("gm_x_", id),
         NULL,
@@ -277,32 +276,32 @@ grim_row <- function(id) {
         placeholder = "e.g. 5.23"
       )
     ),
-    div(class = "col-auto", dp_input(paste0("gm_dp_", id))),
+    div(class = "grid-cell", dp_input(paste0("gm_dp_", id))),
+    div(class = "grid-sep"),
     div(
-      class = "col-auto",
+      class = "grid-cell",
       textInput(
         paste0("gm_n_", id),
         NULL,
-        width = "110px",
+        width = "100%",
         placeholder = "e.g. 30"
       )
     ),
-    div(class = "col-auto", items_input(paste0("gm_items_", id))),
+    div(class = "grid-cell", items_input(paste0("gm_items_", id))),
     div(
-      class = "col d-flex align-items-center",
+      class = "grid-cell d-flex align-items-center",
       uiOutput(paste0("gm_badge_", id))
     ),
-    div(class = "col-auto", rm_btn(paste0("gm_rm_", id)))
+    div(class = "grid-cell", rm_btn(paste0("gm_rm_", id)))
   )
 }
 
 grimmer_row <- function(id) {
   div(
     id = paste0("grimmer_slot_", id),
-    class = "row g-2 align-items-center mb-1",
     style = if (id <= 3) "" else "display:none;",
     div(
-      class = "col",
+      class = "grid-cell",
       textInput(
         paste0("gr_x_", id),
         NULL,
@@ -310,9 +309,10 @@ grimmer_row <- function(id) {
         placeholder = "e.g. 5.23"
       )
     ),
-    div(class = "col-auto", dp_input(paste0("gr_dp_x_", id))),
+    div(class = "grid-cell", dp_input(paste0("gr_dp_x_", id))),
+    div(class = "grid-sep"),
     div(
-      class = "col",
+      class = "grid-cell",
       textInput(
         paste0("gr_sd_", id),
         NULL,
@@ -320,63 +320,49 @@ grimmer_row <- function(id) {
         placeholder = "e.g. 1.11"
       )
     ),
-    div(class = "col-auto", dp_input(paste0("gr_dp_sd_", id))),
+    div(class = "grid-cell", dp_input(paste0("gr_dp_sd_", id))),
+    div(class = "grid-sep"),
     div(
-      class = "col-auto",
+      class = "grid-cell",
       textInput(
         paste0("gr_n_", id),
         NULL,
-        width = "110px",
+        width = "100%",
         placeholder = "e.g. 30"
       )
     ),
-    div(class = "col-auto", items_input(paste0("gr_items_", id))),
+    div(class = "grid-cell", items_input(paste0("gr_items_", id))),
     div(
-      class = "col d-flex align-items-center",
+      class = "grid-cell d-flex align-items-center",
       uiOutput(paste0("gr_badge_", id))
     ),
-    div(class = "col-auto", rm_btn(paste0("gr_rm_", id)))
+    div(class = "grid-cell", rm_btn(paste0("gr_rm_", id)))
   )
 }
 
 # ── column headers ────────────────────────────────────────────────────────────
-# col-auto header cells wrap a fixed-width inner div matching the input width,
-# so they align with col-auto data cells regardless of Bootstrap gutter.
-
-hdr_style <- "min-height:36px; font-size:.8rem; font-weight:600; color:#868e96; text-transform:uppercase; letter-spacing:.05em;"
-dp_hdr <- div(
-  style = "width:80px; padding-left:2px; white-space:nowrap;",
-  "Decimals"
-)
-n_hdr <- div(
-  style = "width:110px; padding-left:2px; white-space:nowrap; text-transform:none; letter-spacing:0;",
-  "SAMPLE SIZE (N)"
-)
-items_hdr <- div(
-  style = "width:70px; padding-left:2px; white-space:nowrap;",
-  "Items"
-)
 
 grim_header <- div(
-  class = "row g-2 align-items-end mb-0",
-  style = hdr_style,
-  div(class = "col-3 ps-2", "Mean"),
-  div(class = "col-auto", dp_hdr),
-  div(class = "col-auto", n_hdr),
-  div(class = "col-auto", items_hdr),
-  div(class = "col ps-2", "Result")
+  div(class = "grid-hdr", "Mean"),
+  div(class = "grid-hdr", "Decimals"),
+  div(class = "grid-sep"),
+  div(class = "grid-hdr grid-hdr-n", "SAMPLE SIZE (N)"),
+  div(class = "grid-hdr", "Items"),
+  div(class = "grid-hdr", "Result"),
+  div()
 )
 
 grimmer_header <- div(
-  class = "row g-2 align-items-end mb-0",
-  style = hdr_style,
-  div(class = "col ps-2", "Mean"),
-  div(class = "col-auto", dp_hdr),
-  div(class = "col ps-2", "SD"),
-  div(class = "col-auto", dp_hdr),
-  div(class = "col-auto", n_hdr),
-  div(class = "col-auto", items_hdr),
-  div(class = "col ps-2", "Result")
+  div(class = "grid-hdr", "Mean"),
+  div(class = "grid-hdr", "Decimals"),
+  div(class = "grid-sep"),
+  div(class = "grid-hdr", "SD"),
+  div(class = "grid-hdr", "Decimals"),
+  div(class = "grid-sep"),
+  div(class = "grid-hdr grid-hdr-n", "SAMPLE SIZE (N)"),
+  div(class = "grid-hdr", "Items"),
+  div(class = "grid-hdr", "Result"),
+  div()
 )
 
 # ── custom CSS ────────────────────────────────────────────────────────────────
@@ -431,6 +417,39 @@ custom_css <- tags$style(HTML(
   .rm-btn img { opacity: 1 !important; filter: none; }
   .rm-btn:hover { background-color: #fa5252 !important; border-radius: 4px; }
   .rm-btn:hover img { filter: brightness(0) invert(1) !important; }
+
+  /* ── input grids ─────────────────────────────────────────────────────── */
+  .grim-grid {
+    display: grid;
+    grid-template-columns: 1fr 80px 1px 110px 70px 1fr auto;
+    column-gap: .5rem;
+    row-gap: 0;
+  }
+  .grimmer-grid {
+    display: grid;
+    grid-template-columns: 1fr 80px 1px 1fr 80px 1px 110px 70px 1fr auto;
+    column-gap: .5rem;
+    row-gap: 0;
+  }
+  .grim-grid > div,
+  .grimmer-grid > div {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+  }
+  .grid-cell { padding: 2px 0; }
+  .grid-hdr {
+    padding: 4px 0 2px;
+    font-size: .8rem;
+    font-weight: 600;
+    color: #868e96;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    white-space: nowrap;
+  }
+  .grid-hdr-n { text-transform: none; letter-spacing: 0; }
+  .grid-sep { background-color: #dee2e6; align-self: stretch; }
 "
 ))
 
@@ -478,8 +497,11 @@ ui <- page_navbar(
             tags$em("5.20 ≠ 5.2"), ". Multi-item / mean-scored measures",
             "require the number of items in", tags$em("Items.")
           ),
-          grim_header,
-          tagList(lapply(seq_len(MAX_ROWS), grim_row)),
+          div(
+            class = "grim-grid",
+            grim_header,
+            tagList(lapply(seq_len(MAX_ROWS), grim_row))
+          ),
           uiOutput("grim_empty"),
           uiOutput("grim_vis"),
           div(
@@ -516,8 +538,11 @@ ui <- page_navbar(
             "reported to. Multi-item / mean-scored measures require the number",
             "of items in", tags$em("Items.")
           ),
-          grimmer_header,
-          tagList(lapply(seq_len(MAX_ROWS), grimmer_row)),
+          div(
+            class = "grimmer-grid",
+            grimmer_header,
+            tagList(lapply(seq_len(MAX_ROWS), grimmer_row))
+          ),
           uiOutput("grimmer_empty"),
           uiOutput("grimmer_vis"),
           div(
@@ -584,7 +609,7 @@ server <- function(input, output, session) {
     rules <- vapply(
       seq_len(MAX_ROWS),
       function(i) {
-        display <- if (i %in% slots) "flex" else "none"
+        display <- if (i %in% slots) "grid" else "none"
         sprintf("#%s_slot_%d{display:%s!important}", prefix, i, display)
       },
       character(1)
