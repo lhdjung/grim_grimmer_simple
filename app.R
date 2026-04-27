@@ -6,7 +6,8 @@ addResourcePath("images", "images")
 
 MAX_ROWS <- 15
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+
+# Helpers -----------------------------------------------------------------
 
 parse_num <- function(s) {
   if (is.null(s) || !nzchar(trimws(s))) {
@@ -80,7 +81,8 @@ short_reason <- function(reason) {
   reason
 }
 
-# ── validation ────────────────────────────────────────────────────────────────
+
+# Validation --------------------------------------------------------------
 
 # Returns an error string, or NULL if all inputs are valid / not yet entered.
 validate_grim_row <- function(x_str, n_str, dp_x, items) {
@@ -150,7 +152,8 @@ validate_grimmer_row <- function(x_str, sd_str, n_str, dp_x, dp_sd, items) {
   NULL
 }
 
-# ── result / error UI ─────────────────────────────────────────────────────────
+
+# Result / error UI -------------------------------------------------------
 
 error_ui <- function(msg) {
   span(
@@ -225,7 +228,8 @@ next_free <- function(active) {
   min(candidate)
 }
 
-# ── row UI (pre-created; show/hide via CSS) ───────────────────────────────────
+
+# Row UI (pre-created; show/hide via CSS) ---------------------------------
 
 rm_btn <- function(id) {
   actionButton(
@@ -327,7 +331,8 @@ grimmer_row <- function(id) {
   )
 }
 
-# ── column headers ────────────────────────────────────────────────────────────
+
+# Column headers ----------------------------------------------------------
 
 grim_header <- div(
   div(class = "grid-hdr", "Mean"),
@@ -352,7 +357,8 @@ grimmer_header <- div(
   div()
 )
 
-# ── custom CSS ────────────────────────────────────────────────────────────────
+
+# Custom CSS --------------------------------------------------------------
 
 custom_css <- tags$style(HTML(
   "
@@ -440,7 +446,8 @@ custom_css <- tags$style(HTML(
 "
 ))
 
-# ── UI ───────────────────────────────────────────────────────────────────────
+
+# Main UI -----------------------------------------------------------------
 
 ui <- page_navbar(
   title = div(
@@ -464,7 +471,6 @@ ui <- page_navbar(
   navbar_options = navbar_options(bg = "#1e3a5f", underline = FALSE),
   header = tagList(custom_css),
 
-  # ── GRIM tab ───────────────────────────────────────────────────────────────
   nav_panel(
     "GRIM",
     div(
@@ -505,7 +511,6 @@ ui <- page_navbar(
     )
   ),
 
-  # ── GRIMMER tab ────────────────────────────────────────────────────────────
   nav_panel(
     "GRIMMER",
     div(
@@ -586,7 +591,8 @@ ui <- page_navbar(
   )
 )
 
-# ── server ────────────────────────────────────────────────────────────────────
+
+# Server ------------------------------------------------------------------
 
 server <- function(input, output, session) {
   grim_slots <- reactiveVal(1:3)
