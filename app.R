@@ -269,7 +269,7 @@ combined_header <- div(
   div(class = "grid-hdr", "Mean or percentage"),
   div(class = "grid-hdr", "SD (optional)"),
   div(class = "grid-hdr", "Sample size"),
-  div(class = "grid-hdr", "Items"),
+  div(class = "grid-hdr", "Items averaged over"),
   div(class = "grid-hdr", "Result"),
   div()
 )
@@ -320,18 +320,18 @@ custom_css <- tags$style(HTML(
   .btn-outline-primary:hover { background: #2c7be5; color: white; }
   .badge { font-size: .8rem !important; font-weight: 500; letter-spacing: .01em; }
   .bg-success { background-color: #12b886 !important; }
-  .bg-danger  { background-color: #ca225e !important; }
+  .bg-danger  { background-color: #fa5252 !important; }
   .shiny-input-container { margin-bottom: 0; }
   ::placeholder { color: #adb5bd !important; font-style: italic; }
   .rm-btn { background: transparent !important; border: none !important; opacity: 1 !important; }
   .rm-btn img { opacity: 1 !important; filter: none; }
-  .rm-btn:hover { background-color: #ca225e !important; border-radius: 4px; }
+  .rm-btn:hover { background-color: #fa5252 !important; border-radius: 4px; }
   .rm-btn:hover img { filter: brightness(0) invert(1) !important; }
 
   /* ── input grid ──────────────────────────────────────────────────────── */
   .combined-grid {
     display: grid;
-    grid-template-columns: 130px 1fr 1fr 110px 70px 1fr auto;
+    grid-template-columns: 130px 1fr 1fr 110px 90px 1fr auto;
     column-gap: .5rem;
     row-gap: 0;
   }
@@ -341,6 +341,7 @@ custom_css <- tags$style(HTML(
     grid-template-columns: subgrid;
     align-items: center;
   }
+  .combined-grid > div:first-child { align-items: end; }
   .grid-cell { padding: 2px 0; }
   .grid-hdr {
     padding: 4px 0 2px;
@@ -349,7 +350,8 @@ custom_css <- tags$style(HTML(
     color: #868e96;
     text-transform: uppercase;
     letter-spacing: .05em;
-    white-space: nowrap;
+    word-break: normal;
+    hyphens: none;
   }
   .grid-hdr-n { text-transform: none; letter-spacing: 0; }
 "
