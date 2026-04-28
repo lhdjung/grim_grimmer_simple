@@ -320,12 +320,12 @@ custom_css <- tags$style(HTML(
   .btn-outline-primary:hover { background: #2c7be5; color: white; }
   .badge { font-size: .8rem !important; font-weight: 500; letter-spacing: .01em; }
   .bg-success { background-color: #12b886 !important; }
-  .bg-danger  { background-color: #fa5252 !important; }
+  .bg-danger  { background-color: #ca225e !important; }
   .shiny-input-container { margin-bottom: 0; }
   ::placeholder { color: #adb5bd !important; font-style: italic; }
   .rm-btn { background: transparent !important; border: none !important; opacity: 1 !important; }
   .rm-btn img { opacity: 1 !important; filter: none; }
-  .rm-btn:hover { background-color: #fa5252 !important; border-radius: 4px; }
+  .rm-btn:hover { background-color: #ca225e !important; border-radius: 4px; }
   .rm-btn:hover img { filter: brightness(0) invert(1) !important; }
 
   /* ── input grid ──────────────────────────────────────────────────────── */
@@ -440,12 +440,14 @@ ui <- page_navbar(
             a(
               "INSPECT-SR check 4.8",
               href = "https://inspect.sr/chapters/check_4_8.html",
+              style = "color:#ca225e;",
               .noWS = "after"
             ),
             ". INSPECT-SR (",
             a(
               "Wilkinson et al., 2025",
               href = "https://www.medrxiv.org/content/10.1101/2025.09.03.25334905v3",
+              style = "color:#ca225e;",
               .noWS = "outside"
             ),
             ") is a framework for assessing the trustworthiness of",
@@ -456,7 +458,8 @@ ui <- page_navbar(
             "Shiny app made by Lukas Jung, University of Bern, using the",
             a(
               "scrutiny",
-              href = "https://lhdjung.github.io/scrutiny/"
+              href = "https://lhdjung.github.io/scrutiny/",
+              style = "color:#ca225e;"
             ),
             "package for error detection in science."
           )
