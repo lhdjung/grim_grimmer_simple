@@ -287,6 +287,8 @@ custom_css <- tags$style(HTML(
   /* ── navbar ─────────────────────────────────────────────────────────── */
   nav.navbar {
     min-height: 56px;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
   }
   nav.navbar > .container-fluid {
     align-items: center !important;
