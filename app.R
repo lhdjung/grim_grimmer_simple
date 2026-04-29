@@ -529,14 +529,22 @@ ui <- page_navbar(
               .noWS = "after"
             ),
             ". Both allow you to test many values at once, e.g., via",
-            "a CSV file.",
+            "a CSV file. See also",
+            a(
+              "this website",
+              href = "https://trustworthy.scientific.claims/tools/",
+              style = "color:#ca225e;"
+            ),
+            "for more forensic metascience tools.",
             br(),
             br(),
             "With mean-scored scales composed of multiple items, make sure to set",
             tags$em("Items"),
             "to the number of those items. This is crucial for the test outcome.",
             "Also, don't transform any values – enter them just as you read",
-            "them in an article, including any trailing zeros.",
+            "them in an article, including any trailing zeros. For rounding,",
+            "the app assumes numbers were rounded either up from 5 or down",
+            "from 5 – both are accepted.",
             br(),
             br(),
             "If",
@@ -549,11 +557,11 @@ ui <- page_navbar(
               ),
               tags$li(
                 "\"GRIMMER 1/2/3\": Fails GRIMMER, i.e., mean, SD, and sample",
-                "size are inconsistent. GRIMMER consists of 3 separate tests,",
-                "so the app will say which one it is."
+                "size are inconsistent. GRIMMER adds 3 separate tests,",
+                "so the app will say which one the problem is."
               ),
             ),
-            "Specifically, the 3 GRIMMER tests are:",
+            "GRIMMER is GRIM plus 3 additional tests:",
             tags$ol(
               tags$li(
                 "The reconstructed sum of squared observations must be a whole number."
