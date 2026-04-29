@@ -65,7 +65,7 @@ short_reason <- function(reason) {
   if (grepl("GRIMMER inconsistent", reason)) {
     m <- regmatches(reason, regexpr("\\d+", reason))
     if (length(m) > 0 && nzchar(m)) {
-      return(paste0("Test ", m))
+      return(paste0("GRIMMER ", m))
     }
     return("GRIMMER")
   }
@@ -290,14 +290,23 @@ custom_css <- tags$style(HTML(
     min-height: 56px;
   }
   .navbar-brand {
-    padding: 0 1rem 0 0 !important;
-    margin-right: .5rem !important;
-    border-right: 5px solid rgba(255,255,255,.25);
+    position: relative;
+    padding: 0 1.5rem 0 0 !important;
+    margin-right: .75rem !important;
     align-self: stretch;
     display: flex !important;
     align-items: center !important;
     font-weight: 700;
     letter-spacing: -.02em;
+  }
+  .navbar-brand::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 15%;
+    height: 70%;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, rgba(255,255,255,.5) 30%, rgba(255,255,255,.5) 70%, transparent);
   }
   .navbar-brand img {
     display: block;
@@ -306,9 +315,24 @@ custom_css <- tags$style(HTML(
   }
   nav.navbar .navbar-nav {
     align-items: center !important;
+    gap: .25rem;
   }
   nav.navbar .nav-link {
     border-bottom: none !important;
+    border-radius: .375rem !important;
+    padding: .35rem .8rem !important;
+    color: rgba(255,255,255,.75) !important;
+    font-weight: 500;
+    transition: background-color .18s ease, color .18s ease;
+  }
+  nav.navbar .nav-link:hover {
+    background-color: rgba(255,255,255,.12) !important;
+    color: #fff !important;
+  }
+  nav.navbar .nav-link.active {
+    background-color: #fff !important;
+    color: #1e3a5f !important;
+    font-weight: 600;
   }
 
   /* ── cards & inputs ─────────────────────────────────────────────────── */
@@ -318,6 +342,47 @@ custom_css <- tags$style(HTML(
   .form-control:focus { border-color: #2c7be5; box-shadow: 0 0 0 .2rem rgba(44,123,229,.15); }
   .btn-outline-primary { color: #2c7be5; border-color: #2c7be5; }
   .btn-outline-primary:hover { background: #2c7be5; color: white; }
+
+  /* ── action buttons ──────────────────────────────────────────────────── */
+  #combined_add, #download_csv {
+    border: none !important;
+    color: #fff !important;
+    font-size: .875rem !important;
+    font-weight: 500 !important;
+    padding: .375rem .875rem !important;
+    border-radius: .375rem !important;
+    transition: background-color .2s ease, box-shadow .2s ease, transform .1s ease !important;
+  }
+  #combined_add {
+    background-color: #2c7be5 !important;
+    box-shadow: 0 1px 4px rgba(44,123,229,.35) !important;
+  }
+  #combined_add:hover, #combined_add:focus {
+    background-color: #1a68d1 !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(44,123,229,.45) !important;
+    transform: translateY(-1px);
+  }
+  #combined_add:active {
+    background-color: #155ab8 !important;
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(44,123,229,.35) !important;
+  }
+  #download_csv {
+    background-color: #495057 !important;
+    box-shadow: 0 1px 4px rgba(73,80,87,.35) !important;
+  }
+  #download_csv:hover, #download_csv:focus {
+    background-color: #343a40 !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(73,80,87,.45) !important;
+    transform: translateY(-1px);
+  }
+  #download_csv:active {
+    background-color: #212529 !important;
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(73,80,87,.35) !important;
+  }
   .badge { font-size: .8rem !important; font-weight: 500; letter-spacing: .01em; }
   .bg-success { background-color: #12b886 !important; }
   .bg-danger  { background-color: #fa5252 !important; }
@@ -368,7 +433,7 @@ ui <- page_navbar(
       alt = "scrutiny",
       height = "56"
     ),
-    "GRIM & GRIMMER Tester"
+    "Consistency Tester"
   ),
   theme = bs_theme(
     bootswatch = "flatly",
@@ -414,15 +479,84 @@ ui <- page_navbar(
             actionButton(
               "combined_add",
               "+ Add row",
-              class = "btn btn-outline-primary btn-sm"
+              class = "btn btn-grim-add"
             ),
             downloadButton(
               "download_csv",
               "Download CSV",
-              class = "btn btn-outline-secondary btn-sm"
+              class = "btn btn-grim-dl"
             )
           ),
           uiOutput("combined_summary")
+        )
+      )
+    )
+  ),
+
+  nav_panel(
+    "Guidance",
+    div(
+      class = "container py-4",
+      style = "max-width:900px;",
+      card(
+        card_header("Guidance on app usage"),
+        card_body(
+          p(
+            "This app is primarily directed at INSPECT-SR users who are not",
+            "experts in GRIM and GRIMMER. It is designed to emphasize ease of",
+            "use above maximum functionality. For more advanced use of these",
+            "tests, see",
+            a(
+              "this app",
+              href = "https://errors.shinyapps.io/scrutiny/",
+              style = "color:#ca225e;",
+            ),
+            "or the",
+            a(
+              "scrutiny R package",
+              href = "https://lhdjung.github.io/scrutiny/",
+              style = "color:#ca225e;",
+              .noWS = "after"
+            ),
+            ". Both allow you to test many values at once, e.g., via",
+            "a CSV file.",
+            br(),
+            br(),
+            "With mean-scored scales composed of multiple items, make sure to set",
+            tags$em("Items"),
+            "to the number of those items. This is crucial for the test outcome.",
+            "Also, don't transform any values – enter them just as you read",
+            "them in an article, including any trailing zeros.",
+            br(),
+            br(),
+            "If",
+            tags$em("SD"),
+            "is set, these reasons for inconsistencies are given:",
+            br(),
+            tags$ul(
+              tags$li(
+                "\"GRIM\": Fails GRIM, i.e., mean and sample size are inconsistent."
+              ),
+              tags$li(
+                "\"GRIMMER 1/2/3\": Fails GRIMMER, i.e., mean, SD, and sample",
+                "size are inconsistent. GRIMMER consists of 3 separate tests,",
+                "so the app will say which one it is."
+              ),
+            ),
+            "Specifically, the 3 GRIMMER tests are:",
+            tags$ol(
+              tags$li(
+                "The reconstructed sum of squared observations must be a whole number."
+              ),
+              tags$li("The reconstructed SD must match the reported one."),
+              tags$li(
+                "The reconstructed sum of squared observations and the",
+                "reconstructed sum of integers of which the reported means",
+                "are fractions must both be even or both be odd."
+              )
+            ),
+            "Click \"Download CSV\" to get all the results in a tabular file."
+          )
         )
       )
     )
@@ -457,7 +591,7 @@ ui <- page_navbar(
             "can be applied to other fields, as well.",
             br(),
             br(),
-            "Shiny app made by Lukas Jung, University of Bern, using the",
+            "Shiny app made by Lukas Jung and Ian Hussey, University of Bern, using the",
             a(
               "scrutiny",
               href = "https://lhdjung.github.io/scrutiny/",
