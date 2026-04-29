@@ -20,6 +20,9 @@ safe_grim <- function(x_str, n_str, items, percent = FALSE) {
   x <- parse_num(x_str)
   n <- suppressWarnings(as.integer(parse_num(n_str)))
   dx <- decimal_places_scalar(gsub(",", ".", trimws(x_str)))
+  if (percent) {
+    dx <- dx + 2L
+  }
   it <- suppressWarnings(as.integer(items))
   if (anyNA(c(x, n, it)) || n < 2 || it < 1) {
     return(NA)
@@ -91,7 +94,7 @@ validate_combined_row <- function(x_str, sd_str, n_str, items, type) {
   }
   sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
   if (sd_given && isTRUE(type == "Percentage")) {
-    return("GRIMMER does not support percentages")
+    return("SD and percentage are incompatible")
   }
   if (sd_given && is.na(parse_num(sd_str))) {
     return("SD must be a number")
@@ -563,6 +566,11 @@ ui <- page_navbar(
             "Click \"Download CSV\" to get all the results in a tabular file."
           )
         )
+      ),
+      p(
+        class = "text-muted mt-3 mb-0",
+        style = "font-size:.78rem; text-align:center;",
+        "App by Lukas Jung and Ian Hussey, University of Bern."
       )
     )
   ),
