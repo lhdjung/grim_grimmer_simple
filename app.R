@@ -489,6 +489,11 @@ ui <- page_navbar(
           ),
           uiOutput("combined_summary")
         )
+      ),
+      p(
+        class = "text-muted mt-3 mb-0",
+        style = "font-size:.78rem; text-align:center;",
+        "App by Lukas Jung and Ian Hussey, University of Bern."
       )
     )
   ),
@@ -684,12 +689,13 @@ server <- function(input, output, session) {
           res <- safe_grimmer(x_str, sd_str, n_str, items)
           result_ui(res$ok, res$reason)
         } else {
-          result_ui(safe_grim(
+          ok <- safe_grim(
             x_str,
             n_str,
             items,
             percent = isTRUE(type == "Percentage")
-          ))
+          )
+          result_ui(ok, if (isFALSE(ok)) "GRIM inconsistent" else NULL)
         }
       })
     })
