@@ -2,6 +2,12 @@ library(shiny)
 library(bslib)
 library(scrutiny)
 
+# # Deploy like this:
+# rsconnect::deployApp(
+#   appName = "inspect-sr-means-variances",
+#   account = "errors"
+# )
+
 addResourcePath("images", "images")
 
 MAX_ROWS <- 15
