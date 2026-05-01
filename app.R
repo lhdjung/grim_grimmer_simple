@@ -39,6 +39,27 @@ safe_grim <- function(x_str, n_str, items, percent = FALSE) {
   )
 }
 
+grim_uninformative <- function(x_str, n_str, items, percent = FALSE) {
+  n <- suppressWarnings(as.integer(parse_num(n_str)))
+  dx <- decimal_places_scalar(gsub(",", ".", trimws(x_str)))
+  it <- suppressWarnings(as.integer(items))
+  x_clean <- gsub(",", ".", trimws(x_str))
+  if (anyNA(c(n, dx, it)) || is.na(parse_num(x_str)) || n < 2 || it < 1) {
+    return(FALSE)
+  }
+  p <- tryCatch(
+    grim_probability(
+      x = x_clean,
+      n = n,
+      digits_x = dx,
+      items = it,
+      percent = percent
+    ),
+    error = function(e) NA_real_
+  )
+  isTRUE(p == 0)
+}
+
 safe_grimmer <- function(x_str, sd_str, n_str, items) {
   x <- parse_num(x_str)
   sd <- parse_num(sd_str)
@@ -134,39 +155,71 @@ error_ui <- function(msg) {
   )
 }
 
-result_ui <- function(ok, reason = NULL) {
+uninformative_label <- function() {
+  span(
+    class = "text-muted",
+    style = "font-size:.75rem; white-space:nowrap; cursor:help;",
+    title = paste(
+      "Every possible mean is achievable for this N and item count,",
+      "so the GRIM portion of this test cannot fail.",
+      "GRIMMER's SD-based checks (and TIDES, where applicable) remain valid."
+    ),
+    "Uninformative GRIM"
+  )
+}
+
+result_ui <- function(ok, reason = NULL, uninformative = FALSE) {
   if (is.na(ok)) {
     return(span())
   }
   if (ok) {
-    span(
+    badge <- span(
       class = "badge rounded-pill bg-success px-3 py-2",
       HTML("&#10003;&nbsp; Consistent")
     )
+    if (uninformative) {
+      div(
+        class = "d-flex align-items-center gap-2",
+        badge,
+        uninformative_label()
+      )
+    } else {
+      badge
+    }
   } else {
     short <- if (!is.null(reason) && nzchar(reason)) {
       short_reason(reason)
     } else {
       NULL
     }
+    badge <- span(
+      class = "badge rounded-pill bg-danger px-3 py-2",
+      HTML("&#10007;&nbsp; Inconsistent")
+    )
+    extras <- list()
     if (!is.null(short)) {
-      div(
-        class = "d-flex align-items-center gap-2",
-        span(
-          class = "badge rounded-pill bg-danger px-3 py-2",
-          HTML("&#10007;&nbsp; Inconsistent")
-        ),
-        span(
+      extras <- c(
+        extras,
+        list(span(
           class = "text-danger",
           style = "font-size:.75rem; white-space:nowrap;",
           short
+        ))
+      )
+    }
+    if (uninformative) {
+      extras <- c(extras, list(uninformative_label()))
+    }
+    if (length(extras) > 0) {
+      do.call(
+        div,
+        c(
+          list(class = "d-flex align-items-center gap-2", badge),
+          extras
         )
       )
     } else {
-      span(
-        class = "badge rounded-pill bg-danger px-3 py-2",
-        HTML("&#10007;&nbsp; Inconsistent")
-      )
+      badge
     }
   }
 }
@@ -579,7 +632,22 @@ ui <- page_navbar(
                 "are fractions must both be even or both be odd."
               )
             ),
-            "Click \"Download CSV\" to get all the results in a tabular file."
+            "Click \"Download CSV\" to get all the results in a tabular file.",
+            br(),
+            br(),
+            tags$strong("When GRIM is uninformative."),
+            "GRIM cannot fail when every possible mean is achievable",
+            "for the given sample size, i.e., when",
+            tags$em("N"), "*", tags$em("Items"), "≥ 10",
+            tags$sup("D"),
+            "(where", tags$em("D"),
+            "is the number of decimal places of the reported mean,",
+            "plus 2 for percentages). In these cases the app marks the result",
+            "with an", tags$em("Uninformative GRIM"),
+            "label and adds a corresponding entry to the CSV",
+            tags$em("notes"), "column.",
+            "If an SD is provided, the GRIMMER SD-based checks (and TIDES,",
+            "where applied) remain informative even when the GRIM portion is not."
           )
         )
       ),
@@ -709,9 +777,15 @@ server <- function(input, output, session) {
           return(error_ui(err))
         }
         sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
+        uninf <- grim_uninformative(
+          x_str,
+          n_str,
+          items,
+          percent = isTRUE(type == "Percentage")
+        )
         if (sd_given) {
           res <- safe_grimmer(x_str, sd_str, n_str, items)
-          result_ui(res$ok, res$reason)
+          result_ui(res$ok, res$reason, uninformative = uninf)
         } else {
           ok <- safe_grim(
             x_str,
@@ -719,7 +793,11 @@ server <- function(input, output, session) {
             items,
             percent = isTRUE(type == "Percentage")
           )
-          result_ui(ok, if (isFALSE(ok)) "GRIM inconsistent" else NULL)
+          result_ui(
+            ok,
+            if (isFALSE(ok)) "GRIM inconsistent" else NULL,
+            uninformative = uninf
+          )
         }
       })
     })
@@ -781,6 +859,7 @@ server <- function(input, output, session) {
             test = test,
             consistent = NA,
             inconsistency = err,
+            notes = "",
             stringsAsFactors = FALSE
           ))
         }
@@ -797,6 +876,20 @@ server <- function(input, output, session) {
           )
           reason <- ""
         }
+        uninf <- grim_uninformative(
+          x_str,
+          n_str,
+          items,
+          percent = isTRUE(type == "Percentage")
+        )
+        notes <- if (uninf) {
+          paste(
+            "Uninformative GRIM: every possible mean is achievable for this N",
+            "and item count. GRIMMER and TIDES checks remain valid."
+          )
+        } else {
+          ""
+        }
         data.frame(
           type = if (is.null(type)) "Mean" else type,
           mean = trimws(x_str),
@@ -806,6 +899,7 @@ server <- function(input, output, session) {
           test = test,
           consistent = ok,
           inconsistency = reason,
+          notes = notes,
           stringsAsFactors = FALSE
         )
       })
@@ -820,6 +914,7 @@ server <- function(input, output, session) {
           test = character(),
           consistent = logical(),
           inconsistency = character(),
+          notes = character(),
           stringsAsFactors = FALSE
         )
       } else {
