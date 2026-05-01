@@ -94,7 +94,7 @@ safe_bounds <- function(x_str, sd_str, n_str, min_str, max_str) {
         ds <- decimal_places_scalar(gsub(",", ".", trimws(sd_str)))
         tol <- 0.5 * 10^(-ds)
         if (sd > sd_max + tol) {
-          reasons <- c(reasons, "SD exceeds Bhattacharya–Davis bound")
+          reasons <- c(reasons, "SD exceeds Bhatia–Davis bound")
         }
       }
     }
@@ -145,7 +145,9 @@ validate_combined_row <- function(
   min_given <- !is.null(min_str) && nzchar(trimws(min_str))
   max_given <- !is.null(max_str) && nzchar(trimws(max_str))
   if (sd_given && isTRUE(type == "Percentage") && !(min_given && max_given)) {
-    return("For percentages with SD, Min and Max are required (typically 0 and 100)")
+    return(
+      "For percentages with SD, Min and Max are required (typically 0 and 100)"
+    )
   }
   if (sd_given && is.na(parse_num(sd_str))) {
     return("SD must be a number")
@@ -644,7 +646,7 @@ ui <- page_navbar(
             "Optionally also provide ", tags$em("Min"),
             " and ", tags$em("Max"), " (the smallest and largest ", tags$em("possible"), " scores (note: not the observed min and max, but the logical min and max)",
             " to additionally test that the mean is within bounds and that the SD does",
-            " not exceed the Bhattacharya–Davis upper bound. For percentages with",
+            " not exceed the Bhatia–Davis upper bound. For percentages with",
             " SD, Min and Max are required."
           ),
           div(
@@ -734,14 +736,17 @@ ui <- page_navbar(
               ),
               tags$li(
                 "\"Mean out of bounds\": the reported mean is below ",
-                tags$em("Min"), " or above ", tags$em("Max"), "."
+                tags$em("Min"),
+                " or above ",
+                tags$em("Max"),
+                "."
               ),
               tags$li(
                 "\"SD must be > 0\": a reported SD of zero (or negative) is",
                 " flagged when bounds are supplied."
               ),
               tags$li(
-                "\"SD exceeds Bhattacharya–Davis bound\": for a variable in [Min, Max] ",
+                "\"SD exceeds Bhatia–Davis bound\": for a variable in [Min, Max] ",
                 "with the reported mean and N, the maximum possible sample SD is ",
                 tags$code("sqrt((Max - Mean) * (Mean - Min) * N / (N - 1))"),
                 ". A reported SD above this bound is impossible."
@@ -764,7 +769,7 @@ ui <- page_navbar(
             ),
             "Bounds inputs (i.e., 'Logical Min (optional)' and 'Logical Max (optional)') are optional. They enable two additional checks: (a) the mean",
             " must lie inside [Logical Min, Logical Max]; (b) the SD must be greater than 0",
-            " and not exceed the Bhattacharya–Davis upper bound. When 'Type' is set to 'Percentage' and an SD is provided, 'Logical Min' and 'Logical Max' are required (typically 0 and 100), and",
+            " and not exceed the Bhatia–Davis upper bound. When 'Type' is set to 'Percentage' and an SD is provided, 'Logical Min' and 'Logical Max' are required (typically 0 and 100), and",
             " GRIMMER is not run.",
             br(),
             br(),
