@@ -67,6 +67,41 @@ safe_grimmer <- function(x_str, sd_str, n_str, items) {
   list(ok = as.logical(r[[1]]), reason = r[[2]])
 }
 
+safe_bounds <- function(x_str, sd_str, n_str, min_str, max_str) {
+  min_given <- !is.null(min_str) && nzchar(trimws(min_str))
+  max_given <- !is.null(max_str) && nzchar(trimws(max_str))
+  if (!min_given || !max_given) {
+    return(character(0))
+  }
+  x <- parse_num(x_str)
+  mn <- parse_num(min_str)
+  mx <- parse_num(max_str)
+  reasons <- character(0)
+  if (!is.na(x) && !is.na(mn) && !is.na(mx)) {
+    if (x < mn || x > mx) {
+      reasons <- c(reasons, "Mean out of bounds")
+    }
+  }
+  sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
+  if (sd_given) {
+    sd <- parse_num(sd_str)
+    n <- suppressWarnings(as.integer(parse_num(n_str)))
+    if (!anyNA(c(x, sd, n, mn, mx)) && n >= 2 && mx > mn) {
+      if (sd <= 0) {
+        reasons <- c(reasons, "SD must be > 0")
+      } else if (x >= mn && x <= mx) {
+        sd_max <- sqrt((mx - x) * (x - mn) * n / (n - 1))
+        ds <- decimal_places_scalar(gsub(",", ".", trimws(sd_str)))
+        tol <- 0.5 * 10^(-ds)
+        if (sd > sd_max + tol) {
+          reasons <- c(reasons, "SD exceeds Bhattacharya–Davis bound")
+        }
+      }
+    }
+  }
+  reasons
+}
+
 short_reason <- function(reason) {
   if (reason == "GRIM inconsistent") {
     return("GRIM")
@@ -94,13 +129,23 @@ friendly_reason <- function(reason) {
 
 # Validation --------------------------------------------------------------
 
-validate_combined_row <- function(x_str, sd_str, n_str, items, type) {
+validate_combined_row <- function(
+  x_str,
+  sd_str,
+  n_str,
+  items,
+  type,
+  min_str = NULL,
+  max_str = NULL
+) {
   if (!is.null(x_str) && nzchar(trimws(x_str))) {
     if (is.na(parse_num(x_str))) return("Mean must be a number")
   }
   sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
-  if (sd_given && isTRUE(type == "Percentage")) {
-    return("SD and percentage are incompatible")
+  min_given <- !is.null(min_str) && nzchar(trimws(min_str))
+  max_given <- !is.null(max_str) && nzchar(trimws(max_str))
+  if (sd_given && isTRUE(type == "Percentage") && !(min_given && max_given)) {
+    return("For percentages with SD, Min and Max are required (typically 0 and 100)")
   }
   if (sd_given && is.na(parse_num(sd_str))) {
     return("SD must be a number")
@@ -120,7 +165,105 @@ validate_combined_row <- function(x_str, sd_str, n_str, items, type) {
       return("Items must be a positive whole number")
     }
   }
+  if (min_given && is.na(parse_num(min_str))) {
+    return("Min must be a number")
+  }
+  if (max_given && is.na(parse_num(max_str))) {
+    return("Max must be a number")
+  }
+  if (min_given && max_given) {
+    mn <- parse_num(min_str)
+    mx <- parse_num(max_str)
+    if (!is.na(mn) && !is.na(mx) && mx <= mn) {
+      return("Max must be greater than Min")
+    }
+  }
   NULL
+}
+
+
+# Combined evaluator ------------------------------------------------------
+
+# Returns: list(ok, reasons, tests_run, err)
+# - ok: TRUE / FALSE / NA (NA = nothing testable)
+# - reasons: character vector of failure reasons (friendly form)
+# - tests_run: character vector e.g. c("GRIM", "Bounds")
+# - err: validation error string (or NULL); when set, ok = NA
+evaluate_row <- function(x_str, sd_str, n_str, items, type, min_str, max_str) {
+  if (is.null(x_str) || !nzchar(trimws(x_str))) {
+    return(list(
+      ok = NA,
+      reasons = character(0),
+      tests_run = character(0),
+      err = NULL
+    ))
+  }
+  err <- validate_combined_row(
+    x_str,
+    sd_str,
+    n_str,
+    items,
+    type,
+    min_str,
+    max_str
+  )
+  if (!is.null(err)) {
+    return(list(
+      ok = NA,
+      reasons = err,
+      tests_run = character(0),
+      err = err
+    ))
+  }
+
+  sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
+  is_percent <- isTRUE(type == "Percentage")
+  min_given <- !is.null(min_str) && nzchar(trimws(min_str))
+  max_given <- !is.null(max_str) && nzchar(trimws(max_str))
+  bounds_active <- min_given && max_given
+
+  reasons <- character(0)
+  tests_run <- character(0)
+
+  grim_ok <- safe_grim(x_str, n_str, items, percent = is_percent)
+  if (!is.na(grim_ok)) {
+    tests_run <- c(tests_run, "GRIM")
+    if (!grim_ok) reasons <- c(reasons, "Mean fails GRIM")
+  }
+
+  if (sd_given && !is_percent) {
+    res <- safe_grimmer(x_str, sd_str, n_str, items)
+    if (!is.na(res$ok)) {
+      tests_run <- c(tests_run, "GRIMMER")
+      if (!res$ok) {
+        reasons <- c(reasons, friendly_reason(res$reason))
+      }
+    }
+  }
+
+  if (bounds_active) {
+    bounds_reasons <- safe_bounds(x_str, sd_str, n_str, min_str, max_str)
+    tests_run <- c(tests_run, "Bounds")
+    if (length(bounds_reasons) > 0) {
+      reasons <- c(reasons, bounds_reasons)
+    }
+  }
+
+  if (length(tests_run) == 0) {
+    return(list(
+      ok = NA,
+      reasons = character(0),
+      tests_run = character(0),
+      err = NULL
+    ))
+  }
+
+  list(
+    ok = length(reasons) == 0,
+    reasons = reasons,
+    tests_run = tests_run,
+    err = NULL
+  )
 }
 
 
@@ -134,7 +277,7 @@ error_ui <- function(msg) {
   )
 }
 
-result_ui <- function(ok, reason = NULL) {
+result_ui <- function(ok, reasons = character(0)) {
   if (is.na(ok)) {
     return(span())
   }
@@ -144,12 +287,12 @@ result_ui <- function(ok, reason = NULL) {
       HTML("&#10003;&nbsp; Consistent")
     )
   } else {
-    short <- if (!is.null(reason) && nzchar(reason)) {
-      short_reason(reason)
+    label <- if (length(reasons) > 0) {
+      paste(reasons, collapse = "; ")
     } else {
       NULL
     }
-    if (!is.null(short)) {
+    if (!is.null(label) && nzchar(label)) {
       div(
         class = "d-flex align-items-center gap-2",
         span(
@@ -158,8 +301,8 @@ result_ui <- function(ok, reason = NULL) {
         ),
         span(
           class = "text-danger",
-          style = "font-size:.75rem; white-space:nowrap;",
-          short
+          style = "font-size:.72rem; line-height:1.2;",
+          label
         )
       )
     } else {
@@ -263,6 +406,24 @@ combined_row <- function(id) {
     ),
     div(class = "grid-cell", items_input(paste0("cb_items_", id))),
     div(
+      class = "grid-cell",
+      textInput(
+        paste0("cb_min_", id),
+        NULL,
+        width = "100%",
+        placeholder = "optional"
+      )
+    ),
+    div(
+      class = "grid-cell",
+      textInput(
+        paste0("cb_max_", id),
+        NULL,
+        width = "100%",
+        placeholder = "optional"
+      )
+    ),
+    div(
       class = "grid-cell d-flex align-items-center",
       uiOutput(paste0("cb_badge_", id))
     ),
@@ -279,6 +440,8 @@ combined_header <- div(
   div(class = "grid-hdr", "SD (optional)"),
   div(class = "grid-hdr", "Sample size"),
   div(class = "grid-hdr", "Items averaged over"),
+  div(class = "grid-hdr", "Logical Min (optional)"),
+  div(class = "grid-hdr", "Logical Max (optional)"),
   div(class = "grid-hdr", "Result"),
   div()
 )
@@ -407,7 +570,7 @@ custom_css <- tags$style(HTML(
   /* ── input grid ──────────────────────────────────────────────────────── */
   .combined-grid {
     display: grid;
-    grid-template-columns: 130px 1fr 1fr 110px 90px 1fr auto;
+    grid-template-columns: 140px 110px 100px 100px 80px 150px 150px minmax(280px, 1.6fr) auto;
     column-gap: .5rem;
     row-gap: 0;
   }
@@ -459,12 +622,12 @@ ui <- page_navbar(
   header = tagList(custom_css),
 
   nav_panel(
-    "GRIM & GRIMMER",
+    "Granularity and Bounds Testing",
     div(
       class = "container py-4",
-      style = "max-width:950px;",
+      style = "max-width:1250px;",
       card(
-        card_header("GRIM & GRIMMER Test"),
+        card_header("GRIM, GRIMMER and TIDES Tests"),
         card_body(
           # fmt: skip
           p(
@@ -472,11 +635,17 @@ ui <- page_navbar(
             "GRIM checks whether a reported mean is arithmetically possible given",
             "the sample size. GRIMMER extends this to also check the standard deviation (SD).",
             br(), br(),
-            "Enter a mean and N to run GRIM. Adding an SD switches to GRIMMER.",
-            "Mean-scored multi-item scales require the number of items in",
-            tags$em("Items."), "Use ", tags$em("Type"),
-            " to test percentages instead of means. If you do, ", tags$em("SD"),
-            " must be empty."
+            "Enter a mean and N to run GRIM. Adding an SD also runs GRIMMER",
+            "(for means) or, with percentages, only the SD bounds check.",
+            br(), br(),
+            "Mean-scored multi-item scales (but ", tags$em("not"), " sum-scored multi-item scales) require the number of items in",
+            tags$em("Items"), ". Note that this is not the number of items in the scale but the number of values already averaged over before (e.g., within-subjects) before calculating the mean, as this prior averaging 'uses up' some of the granularity that the test relies on. Variables such as 'age' or 'days' are implicitly single-item scales, therefore ", tags$em("Items"), " should be set to 1.",
+            br(), br(),
+            "Optionally also provide ", tags$em("Min"),
+            " and ", tags$em("Max"), " (the smallest and largest ", tags$em("possible"), " scores (note: not the observed min and max, but the logical min and max)",
+            " to additionally test that the mean is within bounds and that the SD does",
+            " not exceed the Bhattacharya–Davis upper bound. For percentages with",
+            " SD, Min and Max are required."
           ),
           div(
             class = "combined-grid",
@@ -553,20 +722,34 @@ ui <- page_navbar(
             "from 5 – both are accepted.",
             br(),
             br(),
-            "If",
-            tags$em("SD"),
-            "is set, these reasons for inconsistencies are given:",
+            "Possible reasons for inconsistency:",
             br(),
             tags$ul(
               tags$li(
-                "\"GRIM\": Fails GRIM, i.e., mean and sample size are inconsistent."
+                "\"Mean fails GRIM\": mean and sample size are inconsistent."
               ),
               tags$li(
-                "\"GRIMMER 1/2/3\": Fails GRIMMER, i.e., mean, SD, and sample",
-                "size are inconsistent. GRIMMER adds 3 separate tests,",
-                "so the app will say which one the problem is."
+                "\"SD fails GRIMMER\": mean, SD, and sample size are inconsistent.",
+                "GRIMMER adds 3 separate tests; the message will say which one failed."
               ),
+              tags$li(
+                "\"Mean out of bounds\": the reported mean is below ",
+                tags$em("Min"), " or above ", tags$em("Max"), "."
+              ),
+              tags$li(
+                "\"SD must be > 0\": a reported SD of zero (or negative) is",
+                " flagged when bounds are supplied."
+              ),
+              tags$li(
+                "\"SD exceeds Bhattacharya–Davis bound\": for a variable in [Min, Max] ",
+                "with the reported mean and N, the maximum possible sample SD is ",
+                tags$code("sqrt((Max - Mean) * (Mean - Min) * N / (N - 1))"),
+                ". A reported SD above this bound is impossible."
+              )
             ),
+            "If multiple checks fail, all failing reasons are listed.",
+            br(),
+            br(),
             "GRIMMER is GRIM plus 3 additional tests:",
             tags$ol(
               tags$li(
@@ -579,6 +762,12 @@ ui <- page_navbar(
                 "are fractions must both be even or both be odd."
               )
             ),
+            "Bounds inputs (i.e., 'Logical Min (optional)' and 'Logical Max (optional)') are optional. They enable two additional checks: (a) the mean",
+            " must lie inside [Logical Min, Logical Max]; (b) the SD must be greater than 0",
+            " and not exceed the Bhattacharya–Davis upper bound. When 'Type' is set to 'Percentage' and an SD is provided, 'Logical Min' and 'Logical Max' are required (typically 0 and 100), and",
+            " GRIMMER is not run.",
+            br(),
+            br(),
             "Click \"Download CSV\" to get all the results in a tabular file."
           )
         )
@@ -683,6 +872,8 @@ server <- function(input, output, session) {
             updateTextInput(session, paste0("cb_sd_", ii), value = "")
             updateTextInput(session, paste0("cb_n_", ii), value = "")
             updateNumericInput(session, paste0("cb_items_", ii), value = 1)
+            updateTextInput(session, paste0("cb_min_", ii), value = "")
+            updateTextInput(session, paste0("cb_max_", ii), value = "")
             updateSelectInput(
               session,
               paste0("cb_type_", ii),
@@ -695,32 +886,36 @@ server <- function(input, output, session) {
         ignoreInit = TRUE
       )
 
+      observeEvent(
+        input[[paste0("cb_type_", ii)]],
+        {
+          if (isTRUE(input[[paste0("cb_type_", ii)]] == "Percentage")) {
+            cur_min <- input[[paste0("cb_min_", ii)]]
+            cur_max <- input[[paste0("cb_max_", ii)]]
+            if (is.null(cur_min) || !nzchar(trimws(cur_min))) {
+              updateTextInput(session, paste0("cb_min_", ii), value = "0")
+            }
+            if (is.null(cur_max) || !nzchar(trimws(cur_max))) {
+              updateTextInput(session, paste0("cb_max_", ii), value = "100")
+            }
+          }
+        },
+        ignoreInit = TRUE
+      )
+
       output[[paste0("cb_badge_", ii)]] <- renderUI({
         x_str <- input[[paste0("cb_x_", ii)]]
         sd_str <- input[[paste0("cb_sd_", ii)]]
         n_str <- input[[paste0("cb_n_", ii)]]
         items <- input[[paste0("cb_items_", ii)]]
         type <- input[[paste0("cb_type_", ii)]]
-        if (is.null(x_str) || !nzchar(trimws(x_str))) {
-          return(NULL)
+        min_str <- input[[paste0("cb_min_", ii)]]
+        max_str <- input[[paste0("cb_max_", ii)]]
+        res <- evaluate_row(x_str, sd_str, n_str, items, type, min_str, max_str)
+        if (!is.null(res$err)) {
+          return(error_ui(res$err))
         }
-        err <- validate_combined_row(x_str, sd_str, n_str, items, type)
-        if (!is.null(err)) {
-          return(error_ui(err))
-        }
-        sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
-        if (sd_given) {
-          res <- safe_grimmer(x_str, sd_str, n_str, items)
-          result_ui(res$ok, res$reason)
-        } else {
-          ok <- safe_grim(
-            x_str,
-            n_str,
-            items,
-            percent = isTRUE(type == "Percentage")
-          )
-          result_ui(ok, if (isFALSE(ok)) "GRIM inconsistent" else NULL)
-        }
+        result_ui(res$ok, res$reasons)
       })
     })
   }
@@ -730,25 +925,16 @@ server <- function(input, output, session) {
     results <- vapply(
       s,
       function(i) {
-        x_str <- input[[paste0("cb_x_", i)]]
-        sd_str <- input[[paste0("cb_sd_", i)]]
-        n_str <- input[[paste0("cb_n_", i)]]
-        items <- input[[paste0("cb_items_", i)]]
-        type <- input[[paste0("cb_type_", i)]]
-        if (is.null(x_str) || !nzchar(trimws(x_str))) {
-          return(NA)
-        }
-        if (
-          !is.null(validate_combined_row(x_str, sd_str, n_str, items, type))
-        ) {
-          return(NA)
-        }
-        sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
-        if (sd_given) {
-          safe_grimmer(x_str, sd_str, n_str, items)$ok
-        } else {
-          safe_grim(x_str, n_str, items, percent = isTRUE(type == "Percentage"))
-        }
+        res <- evaluate_row(
+          input[[paste0("cb_x_", i)]],
+          input[[paste0("cb_sd_", i)]],
+          input[[paste0("cb_n_", i)]],
+          input[[paste0("cb_items_", i)]],
+          input[[paste0("cb_type_", i)]],
+          input[[paste0("cb_min_", i)]],
+          input[[paste0("cb_max_", i)]]
+        )
+        res$ok
       },
       logical(1)
     )
@@ -765,37 +951,34 @@ server <- function(input, output, session) {
         n_str <- input[[paste0("cb_n_", i)]]
         items <- input[[paste0("cb_items_", i)]]
         type <- input[[paste0("cb_type_", i)]]
+        min_str <- input[[paste0("cb_min_", i)]]
+        max_str <- input[[paste0("cb_max_", i)]]
         if (is.null(x_str) || !nzchar(trimws(x_str))) {
           return(NULL)
         }
         sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
-        test <- if (sd_given) "GRIMMER" else "GRIM"
-        err <- validate_combined_row(x_str, sd_str, n_str, items, type)
-        if (!is.null(err)) {
-          return(data.frame(
-            type = if (is.null(type)) "Mean" else type,
-            mean = trimws(x_str),
-            sd = if (sd_given) trimws(sd_str) else "",
-            n = if (!is.null(n_str)) trimws(n_str) else "",
-            items = if (!is.null(items) && !is.na(items)) items else NA_real_,
-            test = test,
-            consistent = NA,
-            inconsistency = err,
-            stringsAsFactors = FALSE
-          ))
-        }
-        if (sd_given) {
-          res <- safe_grimmer(x_str, sd_str, n_str, items)
-          ok <- res$ok
-          reason <- if (!is.na(ok) && !ok) friendly_reason(res$reason) else ""
+        min_given <- !is.null(min_str) && nzchar(trimws(min_str))
+        max_given <- !is.null(max_str) && nzchar(trimws(max_str))
+        res <- evaluate_row(
+          x_str,
+          sd_str,
+          n_str,
+          items,
+          type,
+          min_str,
+          max_str
+        )
+        test_label <- if (length(res$tests_run) == 0) {
+          ""
         } else {
-          ok <- safe_grim(
-            x_str,
-            n_str,
-            items,
-            percent = isTRUE(type == "Percentage")
-          )
-          reason <- ""
+          paste(res$tests_run, collapse = "+")
+        }
+        inconsistency <- if (!is.null(res$err)) {
+          res$err
+        } else if (!is.na(res$ok) && !res$ok) {
+          paste(res$reasons, collapse = "; ")
+        } else {
+          ""
         }
         data.frame(
           type = if (is.null(type)) "Mean" else type,
@@ -803,9 +986,11 @@ server <- function(input, output, session) {
           sd = if (sd_given) trimws(sd_str) else "",
           n = if (!is.null(n_str)) trimws(n_str) else "",
           items = if (!is.null(items) && !is.na(items)) items else NA_real_,
-          test = test,
-          consistent = ok,
-          inconsistency = reason,
+          min = if (min_given) trimws(min_str) else "",
+          max = if (max_given) trimws(max_str) else "",
+          test = test_label,
+          consistent = res$ok,
+          inconsistency = inconsistency,
           stringsAsFactors = FALSE
         )
       })
@@ -817,6 +1002,8 @@ server <- function(input, output, session) {
           sd = character(),
           n = character(),
           items = numeric(),
+          min = character(),
+          max = character(),
           test = character(),
           consistent = logical(),
           inconsistency = character(),
