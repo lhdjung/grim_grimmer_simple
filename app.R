@@ -640,11 +640,19 @@ ui <- page_navbar(
             "Enter a mean and N to run GRIM. Adding an SD also runs GRIMMER",
             "(for means) or, with percentages, only the SD bounds check.",
             br(), br(),
-            "Mean-scored multi-item scales (but ", tags$em("not"), " sum-scored multi-item scales) require the number of items in",
-            tags$em("Items"), ". Note that this is not the number of items in the scale but the number of values already averaged over before (e.g., within-subjects) before calculating the mean, as this prior averaging 'uses up' some of the granularity that the test relies on. Variables such as 'age' or 'days' are implicitly single-item scales, therefore ", tags$em("Items"), " should be set to 1.",
+            "Mean-scored multi-item scales (but ", tags$em("not"),
+            " sum-scored multi-item scales) require the number of items in",
+            tags$em("Items averaged over", .noWS = "after"),
+            ". Note that this is not the number of items in the scale but",
+            "the number of values already averaged over before (e.g., within-subjects)",
+            "before calculating the mean, as this prior averaging \"uses up\" some of the",
+            "granularity that the test relies on. Variables such as \"age\" or \"days\" are, ",
+            "implicitly single-item scales, therefore ", tags$em("Items averaged over"),
+            "should be set to 1.",
             br(), br(),
             "Optionally also provide ", tags$em("Min"),
-            " and ", tags$em("Max"), " (the smallest and largest ", tags$em("possible"), " scores (note: not the observed min and max, but the logical min and max)",
+            " and ", tags$em("Max"), " (the smallest and largest ", tags$em("possible"),
+            " scores (note: not the observed min and max, but the logical min and max)",
             " to additionally test that the mean is within bounds and that the SD does",
             " not exceed the Bhatia–Davis upper bound. For percentages with",
             " SD, Min and Max are required."
@@ -716,7 +724,7 @@ ui <- page_navbar(
             br(),
             br(),
             "With mean-scored scales composed of multiple items, make sure to set",
-            tags$em("Items"),
+            tags$em("Items averaged over"),
             "to the number of those items. This is crucial for the test outcome.",
             "Also, don't transform any values – enter them just as you read",
             "them in an article, including any trailing zeros. For rounding,",
@@ -767,10 +775,12 @@ ui <- page_navbar(
                 "are fractions must both be even or both be odd."
               )
             ),
-            "Bounds inputs (i.e., 'Logical Min (optional)' and 'Logical Max (optional)') are optional. They enable two additional checks: (a) the mean",
+            "Bounds inputs (i.e., \"Logical Min (optional)\" and \"Logical Max (optional)\")",
+            "are optional. They enable two additional checks: (a) the mean",
             " must lie inside [Logical Min, Logical Max]; (b) the SD must be greater than 0",
-            " and not exceed the Bhatia–Davis upper bound. When 'Type' is set to 'Percentage' and an SD is provided, 'Logical Min' and 'Logical Max' are required (typically 0 and 100), and",
-            " GRIMMER is not run.",
+            " and not exceed the Bhatia–Davis upper bound. When \"Type\" is set to \"Percentage\"",
+            "and an SD is provided, \"Logical Min\" and \"Logical Max\" are required",
+            " (typically 0 and 100), and GRIMMER is not run.",
             br(),
             br(),
             "Click \"Download CSV\" to get all the results in a tabular file."
@@ -852,7 +862,7 @@ server <- function(input, output, session) {
     if (length(slots()) == 0) {
       p(
         class = "text-muted fst-italic small mt-2 mb-0",
-        "No rows. Click '+ Add row' to add one."
+        "No rows. Click \"+ Add row\" to add one."
       )
     }
   })
