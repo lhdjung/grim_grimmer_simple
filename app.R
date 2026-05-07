@@ -77,10 +77,8 @@ safe_bounds <- function(x_str, sd_str, n_str, min_str, max_str) {
   mn <- parse_num(min_str)
   mx <- parse_num(max_str)
   reasons <- character(0)
-  if (!is.na(x) && !is.na(mn) && !is.na(mx)) {
-    if (x < mn || x > mx) {
-      reasons <- c(reasons, "Mean out of bounds")
-    }
+  if (!anyNA(c(x, mn, mx)) && x < mn || x > mx) {
+    reasons <- c(reasons, "Mean out of bounds")
   }
   sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
   if (sd_given) {
@@ -974,14 +972,9 @@ server <- function(input, output, session) {
         sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
         min_given <- !is.null(min_str) && nzchar(trimws(min_str))
         max_given <- !is.null(max_str) && nzchar(trimws(max_str))
+        # fmt: skip
         res <- evaluate_row(
-          x_str,
-          sd_str,
-          n_str,
-          items,
-          type,
-          min_str,
-          max_str
+          x_str, sd_str, n_str, items, type, min_str, max_str
         )
         test_label <- if (length(res$tests_run) == 0) {
           ""
