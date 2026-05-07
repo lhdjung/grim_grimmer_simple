@@ -632,12 +632,13 @@ ui <- page_navbar(
           # fmt: skip
           p(
             class = "text-muted mb-3",
-            "GRIM checks whether a reported mean is arithmetically possible given",
+            "GRIM checks whether a reported mean of integer data is arithmetically possible given",
             "the sample size. GRIMMER extends this to also check the standard deviation (SD).",
             br(), br(),
             "Enter a mean and N to run GRIM. Adding an SD also runs GRIMMER",
             "(for means) or, with percentages, only the SD bounds check.",
             br(), br(),
+            "Use this app for integer data only! ",
             "Mean-scored multi-item scales (but ", tags$em("not"),
             " sum-scored multi-item scales) require the number of items in",
             tags$em("Items averaged over", .noWS = "after"),
@@ -822,13 +823,37 @@ ui <- page_navbar(
             "can be applied to other fields, as well.",
             br(),
             br(),
+            "For GRIM, see",
+            a(
+              "Brown and Heathers (2017)",
+              href = "https://doi.org/10.1177/1948550616673876",
+              style = "color:#ca225e;",
+              .noWS = "after"
+            ),
+            ". For GRIMMER, see ",
+            a(
+              "Allard (2018)",
+              href = "https://aurelienallard.netlify.app/post/anaytic-grimmer-possibility-standard-deviations/",
+              style = "color:#ca225e;",
+              .noWS = "after"
+            ),
+            ".",
+            br(),
+            br(),
             "Shiny app made by Lukas Jung and Ian Hussey, University of Bern, using the",
             a(
               "scrutiny",
               href = "https://lhdjung.github.io/scrutiny/",
               style = "color:#ca225e;"
             ),
-            "package for error detection in science."
+            "package for error detection in science. Source code is available ",
+            a(
+              "on Github",
+              href = "https://github.com/lhdjung/inspect-sr-means-variances",
+              style = "color:#ca225e;",
+              .noWS = "after"
+            ),
+            "."
           )
         )
       )
