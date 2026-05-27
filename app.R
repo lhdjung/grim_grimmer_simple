@@ -39,6 +39,27 @@ safe_grim <- function(x_str, n_str, items, percent = FALSE) {
   )
 }
 
+grim_uninformative <- function(x_str, n_str, items, percent = FALSE) {
+  n <- suppressWarnings(as.integer(parse_num(n_str)))
+  dx <- decimal_places_scalar(gsub(",", ".", trimws(x_str)))
+  it <- suppressWarnings(as.integer(items))
+  x_clean <- gsub(",", ".", trimws(x_str))
+  if (anyNA(c(n, dx, it)) || is.na(parse_num(x_str)) || n < 2 || it < 1) {
+    return(FALSE)
+  }
+  p <- tryCatch(
+    grim_probability(
+      x = x_clean,
+      n = n,
+      digits_x = dx,
+      items = it,
+      percent = percent
+    ),
+    error = function(e) NA_real_
+  )
+  isTRUE(p == 0)
+}
+
 safe_grimmer <- function(x_str, sd_str, n_str, items) {
   x <- parse_num(x_str)
   sd <- parse_num(sd_str)
@@ -277,39 +298,83 @@ error_ui <- function(msg) {
   )
 }
 
-result_ui <- function(ok, reasons = character(0)) {
+uninformative_label <- function(digits) {
+  dp_text <- if (digits == 1L) {
+    "1 decimal place"
+  } else {
+    paste0(digits, " decimal places")
+  }
+  tooltip(
+    span(
+      class = "text-muted",
+      style = "font-size:.75rem; white-space:nowrap; cursor:help;",
+      "Uninformative GRIM"
+    ),
+    paste0(
+      "Every possible mean with ",
+      dp_text,
+      " is achievable for this N and item count, so the GRIM test cannot fail."
+    )
+  )
+}
+
+result_ui <- function(
+  ok,
+  reasons = character(0),
+  uninformative = FALSE,
+  digits = NULL
+) {
   if (is.na(ok)) {
     return(span())
   }
   if (ok) {
-    span(
+    badge <- span(
       class = "badge rounded-pill bg-success px-3 py-2",
       HTML("&#10003;&nbsp; Consistent")
     )
+    if (uninformative) {
+      div(
+        class = "d-flex align-items-center gap-2",
+        badge,
+        uninformative_label(digits)
+      )
+    } else {
+      badge
+    }
   } else {
     label <- if (length(reasons) > 0) {
       paste(reasons, collapse = "; ")
     } else {
       NULL
     }
+    badge <- span(
+      class = "badge rounded-pill bg-danger px-3 py-2",
+      HTML("&#10007;&nbsp; Inconsistent")
+    )
+    extras <- list()
     if (!is.null(label) && nzchar(label)) {
-      div(
-        class = "d-flex align-items-center gap-2",
-        span(
-          class = "badge rounded-pill bg-danger px-3 py-2",
-          HTML("&#10007;&nbsp; Inconsistent")
-        ),
-        span(
+      extras <- c(
+        extras,
+        list(span(
           class = "text-danger",
           style = "font-size:.72rem; line-height:1.2;",
           label
+        ))
+      )
+    }
+    if (uninformative) {
+      extras <- c(extras, list(uninformative_label(digits)))
+    }
+    if (length(extras) > 0) {
+      do.call(
+        div,
+        c(
+          list(class = "d-flex align-items-center gap-2", badge),
+          extras
         )
       )
     } else {
-      span(
-        class = "badge rounded-pill bg-danger px-3 py-2",
-        HTML("&#10007;&nbsp; Inconsistent")
-      )
+      badge
     }
   }
 }
@@ -629,28 +694,36 @@ ui <- page_navbar(
       card(
         card_header("GRIM, GRIMMER and TIDES Tests"),
         card_body(
-          # fmt: skip
           p(
             class = "text-muted mb-3",
             "GRIM checks whether a reported mean of integer data is arithmetically possible given",
             "the sample size. GRIMMER extends this to also check the standard deviation (SD).",
-            br(), br(),
+            br(),
+            br(),
             "Enter a mean and N to run GRIM. Adding an SD also runs GRIMMER",
             "(for means) or, with percentages, only the SD bounds check.",
-            br(), br(),
+            br(),
+            br(),
             "Use this app for integer data only! ",
-            "Mean-scored multi-item scales (but ", tags$em("not"),
+            "Mean-scored multi-item scales (but ",
+            tags$em("not"),
             " sum-scored multi-item scales) require the number of items in",
             tags$em("Items averaged over", .noWS = "after"),
             ". Note that this is not the number of items in the scale but",
             "the number of values already averaged over before (e.g., within-subjects)",
             "before calculating the mean, as this prior averaging \"uses up\" some of the",
             "granularity that the test relies on. Variables such as \"age\" or \"days\" are, ",
-            "implicitly single-item scales, therefore ", tags$em("Items averaged over"),
+            "implicitly single-item scales, therefore ",
+            tags$em("Items averaged over"),
             "should be set to 1.",
-            br(), br(),
-            "Optionally also provide ", tags$em("Min"),
-            " and ", tags$em("Max"), " (the smallest and largest ", tags$em("possible"),
+            br(),
+            br(),
+            "Optionally also provide ",
+            tags$em("Min"),
+            " and ",
+            tags$em("Max"),
+            " (the smallest and largest ",
+            tags$em("possible"),
             " scores (note: not the observed min and max, but the logical min and max)",
             " to additionally test that the mean is within bounds and that the SD does",
             " not exceed the Bhatia–Davis upper bound. For percentages with",
@@ -722,13 +795,24 @@ ui <- page_navbar(
             "for more forensic metascience tools.",
             br(),
             br(),
-            "With mean-scored scales composed of multiple items, make sure to set",
+            tags$strong(
+              "With mean-scored scales composed of multiple items",
+              .noWS = "after"
+            ),
+            ", make sure to set",
             tags$em("Items averaged over"),
             "to the number of those items. This is crucial for the test outcome.",
+            tags$em("Items averaged over"),
+            "is the number of test items combined to one final mean score –",
+            " not the number of scale points! Don't use this field unless the",
+            " score was averaged over multiple test items.",
+            " Doing so could also lead to wrong results.",
+            br(),
+            br(),
             "Also, don't transform any values – enter them just as you read",
             "them in an article, including any trailing zeros. For rounding,",
             "the app assumes numbers were rounded either up from 5 or down",
-            "from 5 – both are accepted.",
+            "from 5; both are accepted.",
             br(),
             br(),
             "Possible reasons for inconsistency:",
@@ -783,6 +867,25 @@ ui <- page_navbar(
             br(),
             br(),
             "Click \"Download CSV\" to get all the results in a tabular file."
+          ),
+          p(
+            tags$strong("When GRIM is uninformative:"),
+            "GRIM cannot fail when every possible mean is achievable",
+            "for the given sample size, i.e., when",
+            tags$em("N * (Items averaged over)"),
+            "≥ 10",
+            tags$sup("D", .noWS = "outside"),
+            ", where",
+            tags$em("D"),
+            "is the number of decimal places of the reported mean,",
+            "plus 2 for percentages. In these cases the app marks the result",
+            "with an",
+            tags$em("Uninformative GRIM"),
+            "label and adds a corresponding entry to the CSV",
+            tags$em("notes"),
+            "column.",
+            "If an SD is provided, the GRIMMER SD-based checks (and TIDES,",
+            "where applied) remain informative even when the GRIM portion is not."
           )
         )
       ),
@@ -953,7 +1056,22 @@ server <- function(input, output, session) {
         if (!is.null(res$err)) {
           return(error_ui(res$err))
         }
-        result_ui(res$ok, res$reasons)
+        uninf <- if (!is.null(x_str) && nzchar(trimws(x_str))) {
+          grim_uninformative(
+            x_str,
+            n_str,
+            items,
+            percent = isTRUE(type == "Percentage")
+          )
+        } else {
+          FALSE
+        }
+        dx <- if (!is.null(x_str) && nzchar(trimws(x_str))) {
+          decimal_places_scalar(gsub(",", ".", trimws(x_str)))
+        } else {
+          NULL
+        }
+        result_ui(res$ok, res$reasons, uninformative = uninf, digits = dx)
       })
     })
   }
@@ -1013,6 +1131,20 @@ server <- function(input, output, session) {
         } else {
           ""
         }
+        uninf <- grim_uninformative(
+          x_str,
+          n_str,
+          items,
+          percent = isTRUE(type == "Percentage")
+        )
+        notes <- if (uninf && !sd_given) {
+          paste(
+            "Uninformative GRIM: every possible mean is achievable for this N",
+            "and item count."
+          )
+        } else {
+          ""
+        }
         data.frame(
           type = if (is.null(type)) "Mean" else type,
           mean = trimws(x_str),
@@ -1024,6 +1156,7 @@ server <- function(input, output, session) {
           test = test_label,
           consistent = res$ok,
           inconsistency = inconsistency,
+          notes = notes,
           stringsAsFactors = FALSE
         )
       })
@@ -1040,6 +1173,7 @@ server <- function(input, output, session) {
           test = character(),
           consistent = logical(),
           inconsistency = character(),
+          notes = character(),
           stringsAsFactors = FALSE
         )
       } else {
