@@ -1211,13 +1211,10 @@ ui <- page_navbar(
             tags$em("Key assumptions:"),
             br(),
             br(),
-            "1. Use this app for integer data only! For example, age in years, number of events, Likert data, etc.",
+            "1. ", tags$em("Items Averaged Over"), " is often misunderstood. It is ", tags$em("not"), " the number of items in a multi-item Likert scale, but the number of items averaged over a the participant level. If the scale is sum-scored (which is the most common scoring method in psychology), no averaging has occured so ", tags$em("Items Averaged Over"), " = 1. If the scale was mean-scored, then ", tags$em("Items Averaged Over"), " = the number of items in the scale. Variables such as \"age\" or \"days\" are implicitly single-item scales, therefore ", tags$em("Items Averaged Over"), " = 1.",
             br(),
             br(),
-            "2. ", tags$em("Items averaged over"), " is often misunderstood. It is ", tags$em("not"), " the number of items in a multi-item Likert scale, but the number of items averaged over a the participant level. If the scale is sum-scored (which is the most common scoring method in psychology), no averaging has occured so ", tags$em("Items averaged over"), " = 1. If the scale was mean-scored, then ", tags$em("Items averaged over"), " = the number of items in the scale. Variables such as \"age\" or \"days\" are implicitly single-item scales, therefore ", tags$em("Items averaged over"), " = 1.",
-            br(),
-            br(),
-            "3. ", tags$em("Min"), " and ", tags$em("Max"), " should be set to the scale's logical min and max, not the observed min and max in the data."
+            "2. ", tags$em("Logical Min"), " and ", tags$em("Logical Max"), " should be set to the scale's logical min and max, not the observed min and max in the data."
           ),
           div(
             class = "single-grid-wrap",
