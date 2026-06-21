@@ -12,6 +12,7 @@ library(recalc)
 addResourcePath("images", "images")
 
 MAX_PAIRS <- 15
+MAX_ROWS <- 15
 
 
 # Helpers -----------------------------------------------------------------
@@ -841,6 +842,104 @@ combined_header <- div(
 )
 
 
+# Single-row tab (GRIM / GRIMMER / Bounds only) ---------------------------
+
+# One independent row: M / SD / N with GRIM / GRIMMER / Bounds, no pairing
+# and no t-test. Uses the `gb_` input-id namespace so it never collides with
+# the paired tab's `cb_` ids.
+single_row <- function(id) {
+  div(
+    id = paste0("gb_slot_", id),
+    class = "sg-row",
+    style = if (id <= 3) "" else "display:none;",
+    div(
+      class = "grid-cell",
+      textInput(
+        paste0("gb_var_", id),
+        NULL,
+        width = "100%",
+        placeholder = "BDI"
+      )
+    ),
+    div(
+      class = "grid-cell",
+      selectInput(
+        paste0("gb_type_", id),
+        NULL,
+        choices = c("Mean", "Percentage"),
+        selected = "Mean",
+        width = "100%"
+      )
+    ),
+    div(
+      class = "grid-cell",
+      textInput(
+        paste0("gb_x_", id),
+        NULL,
+        width = "100%",
+        placeholder = "e.g. 5.23"
+      )
+    ),
+    div(
+      class = "grid-cell",
+      textInput(
+        paste0("gb_sd_", id),
+        NULL,
+        width = "100%",
+        placeholder = "optional"
+      )
+    ),
+    div(
+      class = "grid-cell",
+      textInput(
+        paste0("gb_n_", id),
+        NULL,
+        width = "100%",
+        placeholder = "e.g. 30"
+      )
+    ),
+    div(class = "grid-cell", items_input(paste0("gb_items_", id))),
+    div(
+      class = "grid-cell",
+      textInput(
+        paste0("gb_min_", id),
+        NULL,
+        width = "100%",
+        placeholder = "optional"
+      )
+    ),
+    div(
+      class = "grid-cell",
+      textInput(
+        paste0("gb_max_", id),
+        NULL,
+        width = "100%",
+        placeholder = "optional"
+      )
+    ),
+    div(
+      class = "grid-cell d-flex align-items-center",
+      uiOutput(paste0("gb_badge_", id))
+    ),
+    div(class = "grid-cell", rm_btn(paste0("gb_rm_", id)))
+  )
+}
+
+single_header <- div(
+  class = "sg-row sg-header",
+  div(class = "grid-hdr", "Variable"),
+  div(class = "grid-hdr", "Type"),
+  div(class = "grid-hdr", "Mean or percentage"),
+  div(class = "grid-hdr", "SD (optional)"),
+  div(class = "grid-hdr", "Sample size"),
+  div(class = "grid-hdr", "Items averaged over"),
+  div(class = "grid-hdr", "Logical Min (optional)"),
+  div(class = "grid-hdr", "Logical Max (optional)"),
+  div(class = "grid-hdr", "Result"),
+  div()
+)
+
+
 # Custom CSS --------------------------------------------------------------
 
 custom_css <- tags$style(HTML(
@@ -981,6 +1080,24 @@ custom_css <- tags$style(HTML(
   .combined-grid > div.cb-header { align-items: end; }
   .cb-row.pair-start { border-top: 2px solid #ced4da; padding-top: 5px; }
   .cb-row.pair-end { padding-bottom: 7px; }
+
+  /* ── single-row grid (GRIM / GRIMMER / Bounds tab) ───────────────────── */
+  .single-grid-wrap { overflow-x: auto; }
+  .single-grid {
+    display: grid;
+    grid-template-columns: 120px 140px 110px 100px 100px 80px 150px 150px minmax(280px, 1.6fr) auto;
+    column-gap: .5rem;
+    row-gap: 0;
+    min-width: 1330px;
+  }
+  .single-grid > div {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+  }
+  .single-grid > div.sg-header { align-items: end; }
+
   .grid-cell { padding: 2px 0; }
   .grid-hdr {
     padding: 4px 0 2px;
@@ -1022,7 +1139,90 @@ ui <- page_navbar(
   header = tagList(custom_css),
 
   nav_panel(
-    "Granularity, Bounds and t-test p-values",
+    "GRIM / GRIMMER / Bounds",
+    div(
+      class = "container py-4",
+      style = "max-width:1380px;",
+      card(
+        card_header("GRIM, GRIMMER and Bounds Tests"),
+        card_body(
+          p(
+            class = "text-muted mb-3",
+            "GRIM checks whether a reported mean of integer data is arithmetically possible given",
+            "the sample size. GRIMMER extends this to also check the standard deviation (SD).",
+            br(),
+            br(),
+            "Enter a mean and N to run GRIM. Adding an SD also runs GRIMMER",
+            "(for means) or, with percentages, only the SD bounds check.",
+            br(),
+            br(),
+            "Each row is tested independently. To also recalculate the",
+            " independent-samples t-test p-value between two groups, use the",
+            tags$strong("GRIM / GRIMMER / Bounds / t-test p value"),
+            "tab.",
+            br(),
+            br(),
+            "Use this app for integer data only! ",
+            "Mean-scored multi-item scales (but ",
+            tags$em("not"),
+            " sum-scored multi-item scales) require the number of items in",
+            tags$em("Items averaged over", .noWS = "after"),
+            ". Note that this is not the number of items in the scale but",
+            "the number of values already averaged over before (e.g., within-subjects)",
+            "before calculating the mean, as this prior averaging \"uses up\" some of the",
+            "granularity that the test relies on. Variables such as \"age\" or \"days\" are, ",
+            "implicitly single-item scales, therefore ",
+            tags$em("Items averaged over"),
+            "should be set to 1.",
+            br(),
+            br(),
+            "Optionally also provide ",
+            tags$em("Min"),
+            " and ",
+            tags$em("Max"),
+            " (the smallest and largest ",
+            tags$em("possible"),
+            " scores (note: not the observed min and max, but the logical min and max)",
+            " to additionally test that the mean is within bounds and that the SD does",
+            " not exceed the Bhatia–Davis upper bound. For percentages with",
+            " SD, Min and Max are required."
+          ),
+          div(
+            class = "single-grid-wrap",
+            div(
+              class = "single-grid",
+              single_header,
+              tagList(lapply(seq_len(MAX_ROWS), single_row))
+            )
+          ),
+          uiOutput("gb_empty"),
+          uiOutput("gb_vis"),
+          div(
+            class = "mt-3 d-flex gap-2",
+            actionButton(
+              "gb_add",
+              "+ Add row",
+              class = "btn btn-grim-add"
+            ),
+            downloadButton(
+              "gb_download",
+              "Download CSV",
+              class = "btn btn-grim-dl"
+            )
+          ),
+          uiOutput("gb_summary")
+        )
+      ),
+      p(
+        class = "text-muted mt-3 mb-0",
+        style = "font-size:.78rem; text-align:center;",
+        "App by Lukas Jung and Ian Hussey, University of Bern."
+      )
+    )
+  ),
+
+  nav_panel(
+    "GRIM / GRIMMER / Bounds / t-test p value",
     div(
       class = "container py-4",
       style = "max-width:1710px;",
@@ -1413,6 +1613,231 @@ ui <- page_navbar(
 # Server ------------------------------------------------------------------
 
 server <- function(input, output, session) {
+
+  # ── Single-row tab: GRIM / GRIMMER / Bounds (gb_ namespace) ───────────────
+  gb_slots <- reactiveVal(1:3)
+
+  gb_vis_css <- function(active) {
+    rules <- vapply(
+      seq_len(MAX_ROWS),
+      function(i) {
+        display <- if (i %in% active) "grid" else "none"
+        sprintf("#gb_slot_%d{display:%s!important}", i, display)
+      },
+      character(1)
+    )
+    tags$style(paste(rules, collapse = ""))
+  }
+
+  output$gb_vis <- renderUI(gb_vis_css(gb_slots()))
+
+  output$gb_empty <- renderUI({
+    if (length(gb_slots()) == 0) {
+      p(
+        class = "text-muted fst-italic small mt-2 mb-0",
+        "No rows. Click \"+ Add row\" to add one."
+      )
+    }
+  })
+
+  observeEvent(input$gb_add, {
+    s <- gb_slots()
+    ns <- next_free(s)
+    if (!is.null(ns)) gb_slots(c(s, ns))
+  })
+
+  for (i in seq_len(MAX_ROWS)) {
+    local({
+      ii <- i
+
+      observeEvent(
+        input[[paste0("gb_rm_", ii)]],
+        {
+          current <- gb_slots()
+          if (ii %in% current) {
+            updateTextInput(session, paste0("gb_var_", ii), value = "")
+            updateTextInput(session, paste0("gb_x_", ii), value = "")
+            updateTextInput(session, paste0("gb_sd_", ii), value = "")
+            updateTextInput(session, paste0("gb_n_", ii), value = "")
+            updateNumericInput(session, paste0("gb_items_", ii), value = 1)
+            updateTextInput(session, paste0("gb_min_", ii), value = "")
+            updateTextInput(session, paste0("gb_max_", ii), value = "")
+            updateSelectInput(session, paste0("gb_type_", ii), selected = "Mean")
+            gb_slots(setdiff(current, ii))
+          }
+        },
+        ignoreNULL = TRUE,
+        ignoreInit = TRUE
+      )
+
+      observeEvent(
+        input[[paste0("gb_type_", ii)]],
+        {
+          if (isTRUE(input[[paste0("gb_type_", ii)]] == "Percentage")) {
+            cur_min <- input[[paste0("gb_min_", ii)]]
+            cur_max <- input[[paste0("gb_max_", ii)]]
+            if (is.null(cur_min) || !nzchar(trimws(cur_min))) {
+              updateTextInput(session, paste0("gb_min_", ii), value = "0")
+            }
+            if (is.null(cur_max) || !nzchar(trimws(cur_max))) {
+              updateTextInput(session, paste0("gb_max_", ii), value = "100")
+            }
+          }
+        },
+        ignoreInit = TRUE
+      )
+
+      output[[paste0("gb_badge_", ii)]] <- renderUI({
+        x_str <- input[[paste0("gb_x_", ii)]]
+        sd_str <- input[[paste0("gb_sd_", ii)]]
+        n_str <- input[[paste0("gb_n_", ii)]]
+        items <- input[[paste0("gb_items_", ii)]]
+        type <- input[[paste0("gb_type_", ii)]]
+        min_str <- input[[paste0("gb_min_", ii)]]
+        max_str <- input[[paste0("gb_max_", ii)]]
+        res <- evaluate_row(x_str, sd_str, n_str, items, type, min_str, max_str)
+        if (!is.null(res$err)) {
+          return(error_ui(res$err))
+        }
+        uninf <- if (!is.null(x_str) && nzchar(trimws(x_str))) {
+          grim_uninformative(
+            x_str,
+            n_str,
+            items,
+            percent = isTRUE(type == "Percentage")
+          )
+        } else {
+          FALSE
+        }
+        dx <- if (!is.null(x_str) && nzchar(trimws(x_str))) {
+          decimal_places_scalar(gsub(",", ".", trimws(x_str)))
+        } else {
+          NULL
+        }
+        result_ui(res$ok, res$reasons, uninformative = uninf, digits = dx)
+      })
+    })
+  }
+
+  output$gb_summary <- renderUI({
+    s <- gb_slots()
+    results <- vapply(
+      s,
+      function(i) {
+        evaluate_row(
+          input[[paste0("gb_x_", i)]],
+          input[[paste0("gb_sd_", i)]],
+          input[[paste0("gb_n_", i)]],
+          input[[paste0("gb_items_", i)]],
+          input[[paste0("gb_type_", i)]],
+          input[[paste0("gb_min_", i)]],
+          input[[paste0("gb_max_", i)]]
+        )$ok
+      },
+      logical(1)
+    )
+    summary_bar(results)
+  })
+
+  output$gb_download <- downloadHandler(
+    filename = function() paste0("grim-grimmer-", Sys.time(), ".csv"),
+    content = function(file) {
+      s <- gb_slots()
+      row_counter <- 0L
+      rows <- lapply(s, function(i) {
+        x_str <- input[[paste0("gb_x_", i)]]
+        sd_str <- input[[paste0("gb_sd_", i)]]
+        n_str <- input[[paste0("gb_n_", i)]]
+        items <- input[[paste0("gb_items_", i)]]
+        type <- input[[paste0("gb_type_", i)]]
+        min_str <- input[[paste0("gb_min_", i)]]
+        max_str <- input[[paste0("gb_max_", i)]]
+        variable <- input[[paste0("gb_var_", i)]]
+        if (is.null(x_str) || !nzchar(trimws(x_str))) {
+          return(NULL)
+        }
+        # When the Variable cell is blank, fall back to an incremental value
+        # numbered per emitted row.
+        row_counter <<- row_counter + 1L
+        var_val <- if (!is.null(variable) && nzchar(trimws(variable))) {
+          trimws(variable)
+        } else {
+          as.character(row_counter)
+        }
+        sd_given <- !is.null(sd_str) && nzchar(trimws(sd_str))
+        min_given <- !is.null(min_str) && nzchar(trimws(min_str))
+        max_given <- !is.null(max_str) && nzchar(trimws(max_str))
+        # fmt: skip
+        res <- evaluate_row(
+          x_str, sd_str, n_str, items, type, min_str, max_str
+        )
+        test_label <- if (length(res$tests_run) == 0) {
+          ""
+        } else {
+          paste(res$tests_run, collapse = "+")
+        }
+        inconsistency <- if (!is.null(res$err)) {
+          res$err
+        } else if (!is.na(res$ok) && !res$ok) {
+          paste(res$reasons, collapse = "; ")
+        } else {
+          ""
+        }
+        uninf <- grim_uninformative(
+          x_str,
+          n_str,
+          items,
+          percent = isTRUE(type == "Percentage")
+        )
+        notes <- if (uninf && !sd_given) {
+          paste(
+            "Uninformative GRIM: every possible mean is achievable for this N",
+            "and item count."
+          )
+        } else {
+          ""
+        }
+        data.frame(
+          variable = var_val,
+          type = if (is.null(type)) "Mean" else type,
+          mean = trimws(x_str),
+          sd = if (sd_given) trimws(sd_str) else "",
+          n = if (!is.null(n_str)) trimws(n_str) else "",
+          items = if (!is.null(items) && !is.na(items)) items else NA_real_,
+          min = if (min_given) trimws(min_str) else "",
+          max = if (max_given) trimws(max_str) else "",
+          test = test_label,
+          consistent = res$ok,
+          inconsistency = inconsistency,
+          notes = notes,
+          stringsAsFactors = FALSE
+        )
+      })
+      rows <- Filter(Negate(is.null), rows)
+      if (length(rows) == 0) {
+        df <- data.frame(
+          variable = character(),
+          type = character(),
+          mean = character(),
+          sd = character(),
+          n = character(),
+          items = numeric(),
+          min = character(),
+          max = character(),
+          test = character(),
+          consistent = logical(),
+          inconsistency = character(),
+          notes = character(),
+          stringsAsFactors = FALSE
+        )
+      } else {
+        df <- do.call(rbind, rows)
+      }
+      write.csv(df, file, row.names = FALSE)
+    }
+  )
+
+  # ── Paired tab: GRIM / GRIMMER / Bounds / t-test p value (cb_ namespace) ──
   pairs <- reactiveVal(1:2)
 
   vis_css <- function(active) {
