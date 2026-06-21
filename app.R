@@ -253,12 +253,22 @@ validate_combined_row <- function(
 # - reasons: character vector of failure reasons (friendly form)
 # - tests_run: character vector e.g. c("GRIM", "Bounds")
 # - err: validation error string (or NULL); when set, ok = NA
-evaluate_row <- function(x_str, sd_str, n_str, items, type, min_str, max_str) {
+evaluate_row <- function(
+  x_str,
+  sd_str,
+  n_str,
+  items,
+  type,
+  min_str,
+  max_str,
+  integer = TRUE
+) {
   if (is.null(x_str) || !nzchar(trimws(x_str))) {
     return(list(
       ok = NA,
       reasons = character(0),
       tests_run = character(0),
+      notes = character(0),
       err = NULL
     ))
   }
@@ -276,6 +286,7 @@ evaluate_row <- function(x_str, sd_str, n_str, items, type, min_str, max_str) {
       ok = NA,
       reasons = err,
       tests_run = character(0),
+      notes = character(0),
       err = err
     ))
   }
@@ -288,21 +299,29 @@ evaluate_row <- function(x_str, sd_str, n_str, items, type, min_str, max_str) {
 
   reasons <- character(0)
   tests_run <- character(0)
+  notes <- character(0)
 
-  grim_ok <- safe_grim(x_str, n_str, items, percent = is_percent)
-  if (!is.na(grim_ok)) {
-    tests_run <- c(tests_run, "GRIM")
-    if (!grim_ok) reasons <- c(reasons, "Mean fails GRIM")
-  }
+  # GRIM and GRIMMER are only valid for integer data. When the data are not
+  # flagged as integer, skip them and say so; the Bounds checks (mean within
+  # [min, max] and the Bhatia–Davis SD bound) still apply to continuous data.
+  if (isTRUE(integer)) {
+    grim_ok <- safe_grim(x_str, n_str, items, percent = is_percent)
+    if (!is.na(grim_ok)) {
+      tests_run <- c(tests_run, "GRIM")
+      if (!grim_ok) reasons <- c(reasons, "Mean fails GRIM")
+    }
 
-  if (sd_given && !is_percent) {
-    res <- safe_grimmer(x_str, sd_str, n_str, items)
-    if (!is.na(res$ok)) {
-      tests_run <- c(tests_run, "GRIMMER")
-      if (!res$ok) {
-        reasons <- c(reasons, friendly_reason(res$reason))
+    if (sd_given && !is_percent) {
+      res <- safe_grimmer(x_str, sd_str, n_str, items)
+      if (!is.na(res$ok)) {
+        tests_run <- c(tests_run, "GRIMMER")
+        if (!res$ok) {
+          reasons <- c(reasons, friendly_reason(res$reason))
+        }
       }
     }
+  } else {
+    notes <- c(notes, "GRIM/GRIMMER only apply to integer data")
   }
 
   if (bounds_active) {
@@ -318,6 +337,7 @@ evaluate_row <- function(x_str, sd_str, n_str, items, type, min_str, max_str) {
       ok = NA,
       reasons = character(0),
       tests_run = character(0),
+      notes = notes,
       err = NULL
     ))
   }
@@ -326,6 +346,7 @@ evaluate_row <- function(x_str, sd_str, n_str, items, type, min_str, max_str) {
     ok = length(reasons) == 0,
     reasons = reasons,
     tests_run = tests_run,
+    notes = notes,
     err = NULL
   )
 }
@@ -461,21 +482,44 @@ result_ui <- function(
   ok,
   reasons = character(0),
   uninformative = FALSE,
-  digits = NULL
+  digits = NULL,
+  notes = character(0)
 ) {
+  note_spans <- lapply(notes, function(n) {
+    span(
+      class = "text-muted",
+      style = "font-size:.72rem; line-height:1.2;",
+      n
+    )
+  })
+
+  # NA = no pass/fail decision (nothing testable). Still surface any notes,
+  # e.g. the "GRIM/GRIMMER only apply to integer data" message.
   if (is.na(ok)) {
-    return(span())
+    if (length(note_spans) == 0) {
+      return(span())
+    }
+    return(do.call(
+      div,
+      c(list(class = "d-flex flex-wrap align-items-center gap-2"), note_spans)
+    ))
   }
   if (ok) {
     badge <- span(
       class = "badge rounded-pill bg-success px-3 py-2",
       HTML("&#10003;&nbsp; Consistent")
     )
+    extras <- note_spans
     if (uninformative) {
-      div(
-        class = "d-flex flex-wrap align-items-center gap-2",
-        badge,
-        uninformative_label(digits)
+      extras <- c(extras, list(uninformative_label(digits)))
+    }
+    if (length(extras) > 0) {
+      do.call(
+        div,
+        c(
+          list(class = "d-flex flex-wrap align-items-center gap-2", badge),
+          extras
+        )
       )
     } else {
       badge
@@ -501,6 +545,7 @@ result_ui <- function(
         ))
       )
     }
+    extras <- c(extras, note_spans)
     if (uninformative) {
       extras <- c(extras, list(uninformative_label(digits)))
     }
@@ -749,6 +794,10 @@ combined_pair <- function(p) {
         )
       ),
       div(
+        class = "grid-cell int-cell",
+        checkboxInput(paste0("cb_int_", p), NULL, value = FALSE)
+      ),
+      div(
         class = "grid-cell",
         textInput(
           paste0("cb_grp_", rid_a),
@@ -798,6 +847,7 @@ combined_pair <- function(p) {
       class = "cb-row pair-end",
       style = shown,
       div(class = "grid-cell"),
+      div(class = "grid-cell"),
       div(
         class = "grid-cell",
         textInput(
@@ -826,6 +876,7 @@ combined_pair <- function(p) {
 combined_header <- div(
   class = "cb-row cb-header",
   div(class = "grid-hdr", "Variable"),
+  div(class = "grid-hdr", "Integer data"),
   div(class = "grid-hdr", "Group"),
   div(class = "grid-hdr", "Type"),
   div(class = "grid-hdr", "Mean or percentage"),
@@ -860,6 +911,10 @@ single_row <- function(id) {
         width = "100%",
         placeholder = "BDI"
       )
+    ),
+    div(
+      class = "grid-cell int-cell",
+      checkboxInput(paste0("gb_int_", id), NULL, value = FALSE)
     ),
     div(
       class = "grid-cell",
@@ -928,6 +983,7 @@ single_row <- function(id) {
 single_header <- div(
   class = "sg-row sg-header",
   div(class = "grid-hdr", "Variable"),
+  div(class = "grid-hdr", "Integer data"),
   div(class = "grid-hdr", "Type"),
   div(class = "grid-hdr", "Mean or percentage"),
   div(class = "grid-hdr", "SD (optional)"),
@@ -1011,7 +1067,7 @@ custom_css <- tags$style(HTML(
   .btn-outline-primary:hover { background: #2c7be5; color: white; }
 
   /* ── action buttons ──────────────────────────────────────────────────── */
-  #combined_add, #download_csv {
+  #combined_add, #download_csv, #gb_add, #gb_download {
     border: none !important;
     color: #fff !important;
     font-size: .875rem !important;
@@ -1020,32 +1076,32 @@ custom_css <- tags$style(HTML(
     border-radius: .375rem !important;
     transition: background-color .2s ease, box-shadow .2s ease, transform .1s ease !important;
   }
-  #combined_add {
+  #combined_add, #gb_add {
     background-color: #2c7be5 !important;
     box-shadow: 0 1px 4px rgba(44,123,229,.35) !important;
   }
-  #combined_add:hover, #combined_add:focus {
+  #combined_add:hover, #combined_add:focus, #gb_add:hover, #gb_add:focus {
     background-color: #1a68d1 !important;
     color: #fff !important;
     box-shadow: 0 4px 12px rgba(44,123,229,.45) !important;
     transform: translateY(-1px);
   }
-  #combined_add:active {
+  #combined_add:active, #gb_add:active {
     background-color: #155ab8 !important;
     transform: translateY(0);
     box-shadow: 0 1px 4px rgba(44,123,229,.35) !important;
   }
-  #download_csv {
+  #download_csv, #gb_download {
     background-color: #495057 !important;
     box-shadow: 0 1px 4px rgba(73,80,87,.35) !important;
   }
-  #download_csv:hover, #download_csv:focus {
+  #download_csv:hover, #download_csv:focus, #gb_download:hover, #gb_download:focus {
     background-color: #343a40 !important;
     color: #fff !important;
     box-shadow: 0 4px 12px rgba(73,80,87,.45) !important;
     transform: translateY(-1px);
   }
-  #download_csv:active {
+  #download_csv:active, #gb_download:active {
     background-color: #212529 !important;
     transform: translateY(0);
     box-shadow: 0 1px 4px rgba(73,80,87,.35) !important;
@@ -1065,10 +1121,10 @@ custom_css <- tags$style(HTML(
   .combined-grid-wrap { overflow-x: auto; }
   .combined-grid {
     display: grid;
-    grid-template-columns: 120px 110px 115px 90px 80px 75px 100px 90px 90px 80px 90px minmax(200px, 1.1fr) minmax(260px, 1.5fr) auto;
+    grid-template-columns: 120px 80px 110px 115px 90px 80px 75px 100px 90px 90px 80px 90px minmax(200px, 1.1fr) minmax(260px, 1.5fr) auto;
     column-gap: .5rem;
     row-gap: 0;
-    min-width: 1630px;
+    min-width: 1718px;
     padding-right: 1.25rem;
   }
   .combined-grid > div {
@@ -1085,10 +1141,10 @@ custom_css <- tags$style(HTML(
   .single-grid-wrap { overflow-x: auto; }
   .single-grid {
     display: grid;
-    grid-template-columns: 120px 140px 110px 100px 100px 80px 150px 150px minmax(280px, 1.6fr) auto;
+    grid-template-columns: 120px 80px 140px 110px 100px 100px 80px 150px 150px minmax(280px, 1.6fr) auto;
     column-gap: .5rem;
     row-gap: 0;
-    min-width: 1330px;
+    min-width: 1418px;
   }
   .single-grid > div {
     display: grid;
@@ -1099,6 +1155,10 @@ custom_css <- tags$style(HTML(
   .single-grid > div.sg-header { align-items: end; }
 
   .grid-cell { padding: 2px 0; }
+  .int-cell { display: flex; align-items: center; justify-content: center; }
+  .int-cell .form-group, .int-cell .checkbox, .int-cell .shiny-input-container { margin: 0 !important; min-height: 0 !important; }
+  .int-cell .form-check { margin: 0 !important; min-height: 0 !important; padding-left: 0 !important; }
+  .int-cell input[type=checkbox] { margin: 0 !important; float: none !important; width: 18px; height: 18px; cursor: pointer; }
   .grid-hdr {
     padding: 4px 0 2px;
     font-size: .8rem;
@@ -1142,50 +1202,22 @@ ui <- page_navbar(
     "GRIM / GRIMMER / Bounds",
     div(
       class = "container py-4",
-      style = "max-width:1380px;",
+      style = "max-width:1470px;",
       card(
         card_header("GRIM, GRIMMER and Bounds Tests"),
         card_body(
           p(
             class = "text-muted mb-3",
-            "GRIM checks whether a reported mean of integer data is arithmetically possible given",
-            "the sample size. GRIMMER extends this to also check the standard deviation (SD).",
+            tags$em("Key assumptions:"),
             br(),
             br(),
-            "Enter a mean and N to run GRIM. Adding an SD also runs GRIMMER",
-            "(for means) or, with percentages, only the SD bounds check.",
+            "1. Use this app for integer data only! For example, age in years, number of events, Likert data, etc.",
             br(),
             br(),
-            "Each row is tested independently. To also recalculate the",
-            " independent-samples t-test p-value between two groups, use the",
-            tags$strong("GRIM / GRIMMER / Bounds / t-test p value"),
-            "tab.",
+            "2. ", tags$em("Items averaged over"), " is often misunderstood. It is ", tags$em("not"), " the number of items in a multi-item Likert scale, but the number of items averaged over a the participant level. If the scale is sum-scored (which is the most common scoring method in psychology), no averaging has occured so ", tags$em("Items averaged over"), " = 1. If the scale was mean-scored, then ", tags$em("Items averaged over"), " = the number of items in the scale. Variables such as \"age\" or \"days\" are implicitly single-item scales, therefore ", tags$em("Items averaged over"), " = 1.",
             br(),
             br(),
-            "Use this app for integer data only! ",
-            "Mean-scored multi-item scales (but ",
-            tags$em("not"),
-            " sum-scored multi-item scales) require the number of items in",
-            tags$em("Items averaged over", .noWS = "after"),
-            ". Note that this is not the number of items in the scale but",
-            "the number of values already averaged over before (e.g., within-subjects)",
-            "before calculating the mean, as this prior averaging \"uses up\" some of the",
-            "granularity that the test relies on. Variables such as \"age\" or \"days\" are, ",
-            "implicitly single-item scales, therefore ",
-            tags$em("Items averaged over"),
-            "should be set to 1.",
-            br(),
-            br(),
-            "Optionally also provide ",
-            tags$em("Min"),
-            " and ",
-            tags$em("Max"),
-            " (the smallest and largest ",
-            tags$em("possible"),
-            " scores (note: not the observed min and max, but the logical min and max)",
-            " to additionally test that the mean is within bounds and that the SD does",
-            " not exceed the Bhatia–Davis upper bound. For percentages with",
-            " SD, Min and Max are required."
+            "3. ", tags$em("Min"), " and ", tags$em("Max"), " should be set to the scale's logical min and max, not the observed min and max in the data."
           ),
           div(
             class = "single-grid-wrap",
@@ -1225,7 +1257,7 @@ ui <- page_navbar(
     "GRIM / GRIMMER / Bounds / t-test p value",
     div(
       class = "container py-4",
-      style = "max-width:1710px;",
+      style = "max-width:1800px;",
       card(
         card_header("GRIM, GRIMMER, Bounds and t-test Recalculation"),
         card_body(
@@ -1656,6 +1688,7 @@ server <- function(input, output, session) {
           current <- gb_slots()
           if (ii %in% current) {
             updateTextInput(session, paste0("gb_var_", ii), value = "")
+            updateCheckboxInput(session, paste0("gb_int_", ii), value = FALSE)
             updateTextInput(session, paste0("gb_x_", ii), value = "")
             updateTextInput(session, paste0("gb_sd_", ii), value = "")
             updateTextInput(session, paste0("gb_n_", ii), value = "")
@@ -1695,11 +1728,14 @@ server <- function(input, output, session) {
         type <- input[[paste0("gb_type_", ii)]]
         min_str <- input[[paste0("gb_min_", ii)]]
         max_str <- input[[paste0("gb_max_", ii)]]
-        res <- evaluate_row(x_str, sd_str, n_str, items, type, min_str, max_str)
+        integer <- isTRUE(input[[paste0("gb_int_", ii)]])
+        res <- evaluate_row(
+          x_str, sd_str, n_str, items, type, min_str, max_str, integer
+        )
         if (!is.null(res$err)) {
           return(error_ui(res$err))
         }
-        uninf <- if (!is.null(x_str) && nzchar(trimws(x_str))) {
+        uninf <- if (integer && !is.null(x_str) && nzchar(trimws(x_str))) {
           grim_uninformative(
             x_str,
             n_str,
@@ -1714,7 +1750,13 @@ server <- function(input, output, session) {
         } else {
           NULL
         }
-        result_ui(res$ok, res$reasons, uninformative = uninf, digits = dx)
+        result_ui(
+          res$ok,
+          res$reasons,
+          uninformative = uninf,
+          digits = dx,
+          notes = res$notes
+        )
       })
     })
   }
@@ -1731,7 +1773,8 @@ server <- function(input, output, session) {
           input[[paste0("gb_items_", i)]],
           input[[paste0("gb_type_", i)]],
           input[[paste0("gb_min_", i)]],
-          input[[paste0("gb_max_", i)]]
+          input[[paste0("gb_max_", i)]],
+          isTRUE(input[[paste0("gb_int_", i)]])
         )$ok
       },
       logical(1)
@@ -1753,6 +1796,7 @@ server <- function(input, output, session) {
         min_str <- input[[paste0("gb_min_", i)]]
         max_str <- input[[paste0("gb_max_", i)]]
         variable <- input[[paste0("gb_var_", i)]]
+        integer <- isTRUE(input[[paste0("gb_int_", i)]])
         if (is.null(x_str) || !nzchar(trimws(x_str))) {
           return(NULL)
         }
@@ -1769,7 +1813,7 @@ server <- function(input, output, session) {
         max_given <- !is.null(max_str) && nzchar(trimws(max_str))
         # fmt: skip
         res <- evaluate_row(
-          x_str, sd_str, n_str, items, type, min_str, max_str
+          x_str, sd_str, n_str, items, type, min_str, max_str, integer
         )
         test_label <- if (length(res$tests_run) == 0) {
           ""
@@ -1783,22 +1827,26 @@ server <- function(input, output, session) {
         } else {
           ""
         }
-        uninf <- grim_uninformative(
+        uninf <- integer && grim_uninformative(
           x_str,
           n_str,
           items,
           percent = isTRUE(type == "Percentage")
         )
-        notes <- if (uninf && !sd_given) {
-          paste(
-            "Uninformative GRIM: every possible mean is achievable for this N",
-            "and item count."
+        note_parts <- res$notes
+        if (uninf && !sd_given) {
+          note_parts <- c(
+            note_parts,
+            paste(
+              "Uninformative GRIM: every possible mean is achievable for this N",
+              "and item count."
+            )
           )
-        } else {
-          ""
         }
+        notes <- paste(note_parts, collapse = "; ")
         data.frame(
           variable = var_val,
+          integer_data = integer,
           type = if (is.null(type)) "Mean" else type,
           mean = trimws(x_str),
           sd = if (sd_given) trimws(sd_str) else "",
@@ -1817,6 +1865,7 @@ server <- function(input, output, session) {
       if (length(rows) == 0) {
         df <- data.frame(
           variable = character(),
+          integer_data = logical(),
           type = character(),
           mean = character(),
           sd = character(),
@@ -1887,7 +1936,11 @@ server <- function(input, output, session) {
 
   eval_rid <- function(rid) {
     r <- read_row(rid)
-    evaluate_row(r$x, r$sd, r$n, r$items, r$type, r$min, r$max)
+    # The Integer-data flag is per-pair; strip the trailing side letter to get
+    # the pair index (e.g. "12a" -> "12").
+    p <- substr(rid, 1, nchar(rid) - 1)
+    integer <- isTRUE(input[[paste0("cb_int_", p)]])
+    evaluate_row(r$x, r$sd, r$n, r$items, r$type, r$min, r$max, integer)
   }
 
   eval_pair_ttest <- function(p) {
@@ -1934,11 +1987,14 @@ server <- function(input, output, session) {
 
           output[[paste0("cb_badge_", rid)]] <- renderUI({
             r <- read_row(rid)
-            res <- evaluate_row(r$x, r$sd, r$n, r$items, r$type, r$min, r$max)
+            integer <- isTRUE(input[[paste0("cb_int_", pp)]])
+            res <- evaluate_row(
+              r$x, r$sd, r$n, r$items, r$type, r$min, r$max, integer
+            )
             if (!is.null(res$err)) {
               return(error_ui(res$err))
             }
-            uninf <- if (!is.null(r$x) && nzchar(trimws(r$x))) {
+            uninf <- if (integer && !is.null(r$x) && nzchar(trimws(r$x))) {
               grim_uninformative(
                 r$x,
                 r$n,
@@ -1953,7 +2009,13 @@ server <- function(input, output, session) {
             } else {
               NULL
             }
-            result_ui(res$ok, res$reasons, uninformative = uninf, digits = dx)
+            result_ui(
+              res$ok,
+              res$reasons,
+              uninformative = uninf,
+              digits = dx,
+              notes = res$notes
+            )
           })
         })
       }
@@ -1970,6 +2032,7 @@ server <- function(input, output, session) {
           current <- pairs()
           if (pp %in% current) {
             updateTextInput(session, paste0("cb_var_", pp), value = "")
+            updateCheckboxInput(session, paste0("cb_int_", pp), value = FALSE)
             updateTextInput(session, paste0("cb_p_", pp), value = "")
             updateSelectInput(
               session,
@@ -2021,6 +2084,7 @@ server <- function(input, output, session) {
       rows <- lapply(s, function(p) {
         tt <- eval_pair_ttest(p)
         variable <- input[[paste0("cb_var_", p)]]
+        integer <- isTRUE(input[[paste0("cb_int_", p)]])
         p_str <- input[[paste0("cb_p_", p)]]
         pop <- input[[paste0("cb_pop_", p)]]
 
@@ -2060,7 +2124,7 @@ server <- function(input, output, session) {
           max_given <- !is.null(r$max) && nzchar(trimws(r$max))
           # fmt: skip
           res <- evaluate_row(
-            r$x, r$sd, r$n, r$items, r$type, r$min, r$max
+            r$x, r$sd, r$n, r$items, r$type, r$min, r$max, integer
           )
           test_label <- if (length(res$tests_run) == 0) {
             ""
@@ -2074,25 +2138,29 @@ server <- function(input, output, session) {
           } else {
             ""
           }
-          uninf <- grim_uninformative(
+          uninf <- integer && grim_uninformative(
             r$x,
             r$n,
             r$items,
             percent = isTRUE(r$type == "Percentage")
           )
-          notes <- if (uninf && !sd_given) {
-            paste(
-              "Uninformative GRIM: every possible mean is achievable for this N",
-              "and item count."
+          note_parts <- res$notes
+          if (uninf && !sd_given) {
+            note_parts <- c(
+              note_parts,
+              paste(
+                "Uninformative GRIM: every possible mean is achievable for this N",
+                "and item count."
+              )
             )
-          } else {
-            ""
           }
+          notes <- paste(note_parts, collapse = "; ")
           # t-test fields only on the first row of the pair
           is_first <- side == "a"
           tt_ok <- identical(tt$status, "ok")
           data.frame(
             variable = if (is_first) var_val else "",
+            integer_data = integer,
             group = group_val,
             type = if (is.null(r$type)) "Mean" else r$type,
             mean = trimws(r$x),
@@ -2135,6 +2203,7 @@ server <- function(input, output, session) {
       if (length(rows) == 0) {
         df <- data.frame(
           variable = character(),
+          integer_data = logical(),
           group = character(),
           type = character(),
           mean = character(),
