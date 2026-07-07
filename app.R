@@ -365,8 +365,12 @@ evaluate_row <- function(
 # - "ok":         recalculated (with $min_p, $max_p, $p_given, $p_reported,
 #                 $inbounds, $p_digits)
 evaluate_pair_ttest <- function(
-  m1s, sd1s, n1s,
-  m2s, sd2s, n2s,
+  m1s,
+  sd1s,
+  n1s,
+  m2s,
+  sd2s,
+  n2s,
   p_str,
   p_operator = "equals"
 ) {
@@ -421,10 +425,18 @@ evaluate_pair_ttest <- function(
 
   res <- tryCatch(
     suppressWarnings(recalc::recalc_independent_t_p(
-      m1 = m1, m2 = m2, sd1 = sd1, sd2 = sd2, n1 = n1, n2 = n2,
-      m_digits = m_digits, sd_digits = sd_digits,
+      m1 = m1,
+      m2 = m2,
+      sd1 = sd1,
+      sd2 = sd2,
+      n1 = n1,
+      n2 = n2,
+      m_digits = m_digits,
+      sd_digits = sd_digits,
       rounding = "either",
-      p = p_num, p_digits = p_digits, p_operator = p_operator,
+      p = p_num,
+      p_digits = p_digits,
+      p_operator = p_operator,
       alternative = "two.sided",
       direction = "both"
     )),
@@ -650,8 +662,9 @@ summary_bar <- function(results_vec) {
 # Summary line for the t-test recalculations across pairs.
 ttest_summary_bar <- function(tts) {
   decided <- Filter(
-    function(tt) identical(tt$status, "ok") && isTRUE(tt$p_given) &&
-      !is.na(tt$inbounds),
+    function(tt) {
+      identical(tt$status, "ok") && isTRUE(tt$p_given) && !is.na(tt$inbounds)
+    },
     tts
   )
   if (length(decided) == 0) {
@@ -1211,10 +1224,24 @@ ui <- page_navbar(
             tags$em("Key assumptions:"),
             br(),
             br(),
-            "1. ", tags$em("Items Averaged Over"), " is often misunderstood. It is ", tags$em("not"), " the number of items in a multi-item Likert scale, but the number of items averaged over a the participant level. If the scale is sum-scored (which is the most common scoring method in psychology), no averaging has occured so ", tags$em("Items Averaged Over"), " = 1. If the scale was mean-scored, then ", tags$em("Items Averaged Over"), " = the number of items in the scale. Variables such as \"age\" or \"days\" are implicitly single-item scales, therefore ", tags$em("Items Averaged Over"), " = 1.",
+            "1. ",
+            tags$em("Items Averaged Over"),
+            " is often misunderstood. It is ",
+            tags$em("not"),
+            " the number of items in a multi-item Likert scale, but the number of items averaged over a the participant level. If the scale is sum-scored (which is the most common scoring method in psychology), no averaging has occured so ",
+            tags$em("Items Averaged Over"),
+            " = 1. If the scale was mean-scored, then ",
+            tags$em("Items Averaged Over"),
+            " = the number of items in the scale. Variables such as \"age\" or \"days\" are implicitly single-item scales, therefore ",
+            tags$em("Items Averaged Over"),
+            " = 1.",
             br(),
             br(),
-            "2. ", tags$em("Logical Min"), " and ", tags$em("Logical Max"), " should be set to the scale's logical min and max, not the observed min and max in the data."
+            "2. ",
+            tags$em("Logical Min"),
+            " and ",
+            tags$em("Logical Max"),
+            " should be set to the scale's logical min and max, not the observed min and max in the data."
           ),
           div(
             class = "single-grid-wrap",
@@ -1263,10 +1290,24 @@ ui <- page_navbar(
             tags$em("Key assumptions:"),
             br(),
             br(),
-            "1. ", tags$em("Items Averaged Over"), " is often misunderstood. It is ", tags$em("not"), " the number of items in a multi-item Likert scale, but the number of items averaged over a the participant level. If the scale is sum-scored (which is the most common scoring method in psychology), no averaging has occured so ", tags$em("Items Averaged Over"), " = 1. If the scale was mean-scored, then ", tags$em("Items Averaged Over"), " = the number of items in the scale. Variables such as \"age\" or \"days\" are implicitly single-item scales, therefore ", tags$em("Items Averaged Over"), " = 1.",
+            "1. ",
+            tags$em("Items Averaged Over"),
+            " is often misunderstood. It is ",
+            tags$em("not"),
+            " the number of items in a multi-item Likert scale, but the number of items averaged over a the participant level. If the scale is sum-scored (which is the most common scoring method in psychology), no averaging has occured so ",
+            tags$em("Items Averaged Over"),
+            " = 1. If the scale was mean-scored, then ",
+            tags$em("Items Averaged Over"),
+            " = the number of items in the scale. Variables such as \"age\" or \"days\" are implicitly single-item scales, therefore ",
+            tags$em("Items Averaged Over"),
+            " = 1.",
             br(),
             br(),
-            "2. ", tags$em("Logical Min"), " and ", tags$em("Logical Max"), " should be set to the scale's logical min and max, not the observed min and max in the data."
+            "2. ",
+            tags$em("Logical Min"),
+            " and ",
+            tags$em("Logical Max"),
+            " should be set to the scale's logical min and max, not the observed min and max in the data."
           ),
           div(
             class = "combined-grid-wrap",
@@ -1488,6 +1529,8 @@ ui <- page_navbar(
             tags$em(">="),
             " check the reported inequality against that range (useful when a",
             " paper reports, e.g., \"p < .001\").",
+            br(),
+            br(),
             "If no reported p is entered, the app simply shows the recalculated",
             " range. The t-test recalculation uses only the Mean, SD and N; it",
             " ignores ",
@@ -1605,7 +1648,6 @@ ui <- page_navbar(
 # Server ------------------------------------------------------------------
 
 server <- function(input, output, session) {
-
   # ── Single-row tab: GRIM / GRIMMER / Bounds (gb_ namespace) ───────────────
   gb_slots <- reactiveVal(1:3)
 
@@ -1655,7 +1697,11 @@ server <- function(input, output, session) {
             updateNumericInput(session, paste0("gb_items_", ii), value = 1)
             updateTextInput(session, paste0("gb_min_", ii), value = "")
             updateTextInput(session, paste0("gb_max_", ii), value = "")
-            updateSelectInput(session, paste0("gb_type_", ii), selected = "Mean")
+            updateSelectInput(
+              session,
+              paste0("gb_type_", ii),
+              selected = "Mean"
+            )
             gb_slots(setdiff(current, ii))
           }
         },
@@ -1690,7 +1736,14 @@ server <- function(input, output, session) {
         max_str <- input[[paste0("gb_max_", ii)]]
         integer <- isTRUE(input[[paste0("gb_int_", ii)]])
         res <- evaluate_row(
-          x_str, sd_str, n_str, items, type, min_str, max_str, integer
+          x_str,
+          sd_str,
+          n_str,
+          items,
+          type,
+          min_str,
+          max_str,
+          integer
         )
         if (!is.null(res$err)) {
           return(error_ui(res$err))
@@ -1787,12 +1840,13 @@ server <- function(input, output, session) {
         } else {
           ""
         }
-        uninf <- integer && grim_uninformative(
-          x_str,
-          n_str,
-          items,
-          percent = isTRUE(type == "Percentage")
-        )
+        uninf <- integer &&
+          grim_uninformative(
+            x_str,
+            n_str,
+            items,
+            percent = isTRUE(type == "Percentage")
+          )
         note_parts <- res$notes
         if (uninf && !sd_given) {
           note_parts <- c(
@@ -1856,7 +1910,10 @@ server <- function(input, output, session) {
         display <- if (p %in% active) "grid" else "none"
         sprintf(
           "#cb_slot_%da{display:%s!important}#cb_slot_%db{display:%s!important}",
-          p, display, p, display
+          p,
+          display,
+          p,
+          display
         )
       },
       character(1)
@@ -1938,7 +1995,11 @@ server <- function(input, output, session) {
                   updateTextInput(session, paste0("cb_min_", rid), value = "0")
                 }
                 if (is.null(cur_max) || !nzchar(trimws(cur_max))) {
-                  updateTextInput(session, paste0("cb_max_", rid), value = "100")
+                  updateTextInput(
+                    session,
+                    paste0("cb_max_", rid),
+                    value = "100"
+                  )
                 }
               }
             },
@@ -1949,7 +2010,14 @@ server <- function(input, output, session) {
             r <- read_row(rid)
             integer <- isTRUE(input[[paste0("cb_int_", pp)]])
             res <- evaluate_row(
-              r$x, r$sd, r$n, r$items, r$type, r$min, r$max, integer
+              r$x,
+              r$sd,
+              r$n,
+              r$items,
+              r$type,
+              r$min,
+              r$max,
+              integer
             )
             if (!is.null(res$err)) {
               return(error_ui(res$err))
@@ -2098,12 +2166,13 @@ server <- function(input, output, session) {
           } else {
             ""
           }
-          uninf <- integer && grim_uninformative(
-            r$x,
-            r$n,
-            r$items,
-            percent = isTRUE(r$type == "Percentage")
-          )
+          uninf <- integer &&
+            grim_uninformative(
+              r$x,
+              r$n,
+              r$items,
+              percent = isTRUE(r$type == "Percentage")
+            )
           note_parts <- res$notes
           if (uninf && !sd_given) {
             note_parts <- c(
@@ -2126,18 +2195,26 @@ server <- function(input, output, session) {
             mean = trimws(r$x),
             sd = if (sd_given) trimws(r$sd) else "",
             n = if (!is.null(r$n)) trimws(r$n) else "",
-            items = if (!is.null(r$items) && !is.na(r$items)) r$items else NA_real_,
+            items = if (!is.null(r$items) && !is.na(r$items)) {
+              r$items
+            } else {
+              NA_real_
+            },
             min = if (min_given) trimws(r$min) else "",
             max = if (max_given) trimws(r$max) else "",
             test = test_label,
             consistent = res$ok,
             inconsistency = inconsistency,
-            p_operator = if (is_first && !is.null(p_str) && nzchar(trimws(p_str))) {
+            p_operator = if (
+              is_first && !is.null(p_str) && nzchar(trimws(p_str))
+            ) {
               op_symbol(pop)
             } else {
               ""
             },
-            reported_p = if (is_first && !is.null(p_str) && nzchar(trimws(p_str))) {
+            reported_p = if (
+              is_first && !is.null(p_str) && nzchar(trimws(p_str))
+            ) {
               trimws(p_str)
             } else {
               ""
