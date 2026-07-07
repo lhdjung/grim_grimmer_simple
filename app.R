@@ -1500,21 +1500,23 @@ ui <- page_navbar(
             tags$em("Reported p"),
             " on the first row of the pair, the app checks whether that",
             " reported value falls inside the recalculated range (after rounding",
-            " both to the reported p's precision):",
-            tags$ul(
-              tags$li(
-                tags$strong("\"Consistent\""),
-                ": the reported p-value is compatible with the reported means,",
-                " SDs and Ns under at least one of the analytic choices explored."
-              ),
-              tags$li(
-                tags$strong("\"Inconsistent\""),
-                ": no combination of the explored choices yields the reported",
-                " p-value. This warrants a closer look – it may reflect a typo,",
-                " a different (e.g. adjusted or non-parametric) test, a covariate",
-                " adjustment, or an error."
-              )
+            " both to the reported p's precision):"
+          ),
+          tags$ul(
+            tags$li(
+              tags$strong("\"Consistent\""),
+              ": the reported p-value is compatible with the reported means,",
+              " SDs and Ns under at least one of the analytic choices explored."
             ),
+            tags$li(
+              tags$strong("\"Inconsistent\""),
+              ": no combination of the explored choices yields the reported",
+              " p-value. This warrants a closer look – it may reflect a typo,",
+              " a different (e.g. adjusted or non-parametric) test, a covariate",
+              " adjustment, or an error."
+            )
+          ),
+          p(
             "The ",
             tags$em("p operator"),
             " selector controls how the reported p is compared: ",
