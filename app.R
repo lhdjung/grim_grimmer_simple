@@ -134,25 +134,18 @@ safe_bounds <- function(x_str, sd_str, n_str, min_str, max_str) {
   reasons
 }
 
-short_reason <- function(reason) {
-  if (reason == "GRIM inconsistent") {
-    return("GRIM")
-  }
-  if (grepl("GRIMMER inconsistent", reason)) {
-    m <- regmatches(reason, regexpr("\\d+", reason))
-    if (length(m) > 0 && nzchar(m)) {
-      return(paste0("GRIMMER ", m))
-    }
-    return("GRIMMER")
-  }
-  reason
-}
-
 friendly_reason <- function(reason) {
   if (reason == "GRIM inconsistent") {
     return("Mean fails GRIM")
   }
   if (grepl("GRIMMER inconsistent", reason)) {
+    # grimmer() reports which of its 3 sub-tests failed, e.g.
+    # "GRIMMER inconsistent (test 3)". Keep that number so the badge matches
+    # the Guidance promise that the message says which test failed.
+    m <- regmatches(reason, regexpr("\\d+", reason))
+    if (length(m) > 0 && nzchar(m)) {
+      return(paste0("SD fails GRIMMER (test ", m, ")"))
+    }
     return("SD fails GRIMMER")
   }
   reason
@@ -322,8 +315,6 @@ evaluate_row <- function(
         }
       }
     }
-  } else {
-    notes <- c(notes, "GRIM/GRIMMER only apply to integer data")
   }
 
   if (bounds_active) {
@@ -332,6 +323,14 @@ evaluate_row <- function(
     if (length(bounds_reasons) > 0) {
       reasons <- c(reasons, bounds_reasons)
     }
+  }
+
+  # Explain the absence of a GRIM/GRIMMER result only when nothing else produced
+  # a verdict. When Bounds yields a Consistent/Inconsistent badge, this note
+  # would contradict it (the reported "Consistent" + "only apply to integer
+  # data" combination), so it is suppressed in that case.
+  if (!isTRUE(integer) && length(tests_run) == 0) {
+    notes <- c(notes, "GRIM/GRIMMER only apply to integer data")
   }
 
   if (length(tests_run) == 0) {
@@ -1063,6 +1062,12 @@ custom_css <- tags$style(HTML(
     height: 56px;
     width: auto;
   }
+  /* The brand is not a functional link, so suppress flatly's green
+     (--bs-navbar-brand-hover-color: #18bc9c) hover/focus colour change. */
+  nav.navbar .navbar-brand:hover,
+  nav.navbar .navbar-brand:focus {
+    color: var(--bs-navbar-brand-color, #fff) !important;
+  }
   nav.navbar .navbar-nav {
     align-items: center !important;
     gap: .25rem;
@@ -1775,7 +1780,10 @@ server <- function(input, output, session) {
           FALSE
         }
         dx <- if (!is.null(x_str) && nzchar(trimws(x_str))) {
-          decimal_places_scalar(gsub(",", ".", trimws(x_str)))
+          d <- decimal_places_scalar(gsub(",", ".", trimws(x_str)))
+          # GRIM works on the proportion for percentages, so its granularity is
+          # dp + 2; reflect that in the "Uninformative GRIM" tooltip.
+          if (isTRUE(type == "Percentage")) d + 2L else d
         } else {
           NULL
         }
@@ -2049,7 +2057,10 @@ server <- function(input, output, session) {
               FALSE
             }
             dx <- if (!is.null(r$x) && nzchar(trimws(r$x))) {
-              decimal_places_scalar(gsub(",", ".", trimws(r$x)))
+              d <- decimal_places_scalar(gsub(",", ".", trimws(r$x)))
+              # GRIM works on the proportion for percentages, so its granularity
+              # is dp + 2; reflect that in the "Uninformative GRIM" tooltip.
+              if (isTRUE(r$type == "Percentage")) d + 2L else d
             } else {
               NULL
             }
