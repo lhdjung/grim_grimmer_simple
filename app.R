@@ -377,6 +377,14 @@ evaluate_pair_ttest <- function(
   if (is.null(p_operator) || !nzchar(p_operator)) {
     p_operator <- "equals"
   }
+  # A reported p outside [0, 1] is invalid regardless of whether the group
+  # statistics are complete, so flag it before the completeness checks below.
+  if (!is.null(p_str) && nzchar(trimws(p_str))) {
+    p_check <- parse_num(p_str)
+    if (is.na(p_check) || p_check < 0 || p_check > 1) {
+      return(list(status = "error", msg = "Reported p must be between 0 and 1"))
+    }
+  }
   cells <- list(m1s, sd1s, n1s, m2s, sd2s, n2s)
   filled <- vapply(
     cells,
@@ -407,13 +415,9 @@ evaluate_pair_ttest <- function(
     return(list(status = "error", msg = "SD must be > 0 in both groups"))
   }
 
+  # Reported p was already validated to lie in [0, 1] above.
   p_given <- !is.null(p_str) && nzchar(trimws(p_str))
   p_num <- if (p_given) parse_num(p_str) else NULL
-  if (p_given) {
-    if (is.na(p_num) || p_num < 0 || p_num > 1) {
-      return(list(status = "error", msg = "Reported p must be between 0 and 1"))
-    }
-  }
 
   # recalc requires a single decimal-place count for the means and one for the
   # SDs. Baseline tables almost always report both groups to the same
