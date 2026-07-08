@@ -892,9 +892,9 @@ combined_pair <- function(p) {
 
 combined_header <- div(
   class = "cb-row cb-header",
-  div(class = "grid-hdr", "Variable"),
+  div(class = "grid-hdr", "Label (optional)"),
   div(class = "grid-hdr", "Integer data"),
-  div(class = "grid-hdr", "Group"),
+  div(class = "grid-hdr", "Group (optional)"),
   div(class = "grid-hdr", "Type"),
   div(class = "grid-hdr", "Mean or percentage"),
   div(class = "grid-hdr", "SD"),
@@ -999,7 +999,7 @@ single_row <- function(id) {
 
 single_header <- div(
   class = "sg-row sg-header",
-  div(class = "grid-hdr", "Variable"),
+  div(class = "grid-hdr", "Label (optional)"),
   div(class = "grid-hdr", "Integer data"),
   div(class = "grid-hdr", "Type"),
   div(class = "grid-hdr", "Mean or percentage"),
@@ -1480,7 +1480,7 @@ ui <- page_navbar(
           p(
             tags$strong("t-test recalculation between paired Group rows:"),
             "Each pair of rows that shares a ",
-            tags$em("Variable"),
+            tags$em("Label"),
             " is treated as the two arms of an independent-samples comparison",
             " (e.g., intervention vs. control). When both rows have a Mean, SD",
             " and N, the app recalculates the range of two-sided t-test",
@@ -1865,7 +1865,7 @@ server <- function(input, output, session) {
         }
         notes <- paste(note_parts, collapse = "; ")
         data.frame(
-          variable = var_val,
+          label = var_val,
           integer_data = integer,
           type = if (is.null(type)) "Mean" else type,
           mean = trimws(x_str),
@@ -1884,7 +1884,7 @@ server <- function(input, output, session) {
       rows <- Filter(Negate(is.null), rows)
       if (length(rows) == 0) {
         df <- data.frame(
-          variable = character(),
+          label = character(),
           integer_data = logical(),
           type = character(),
           mean = character(),
@@ -2194,7 +2194,7 @@ server <- function(input, output, session) {
           is_first <- side == "a"
           tt_ok <- identical(tt$status, "ok")
           data.frame(
-            variable = if (is_first) var_val else "",
+            label = if (is_first) var_val else "",
             integer_data = integer,
             group = group_val,
             type = if (is.null(r$type)) "Mean" else r$type,
@@ -2245,7 +2245,7 @@ server <- function(input, output, session) {
       rows <- Filter(Negate(is.null), rows)
       if (length(rows) == 0) {
         df <- data.frame(
-          variable = character(),
+          label = character(),
           integer_data = logical(),
           group = character(),
           type = character(),
