@@ -31,10 +31,11 @@ dp_of <- function(s) {
 safe_grim <- function(x_str, n_str, items, percent = FALSE) {
   x <- parse_num(x_str)
   n <- suppressWarnings(as.integer(parse_num(n_str)))
+  # grim() adds 2 to digits_x internally when percent = TRUE, so we must not add
+  # it here as well: doing so would give percentages dp + 4 effective decimal
+  # places, making the test wrongly strict and disagreeing with
+  # grim_uninformative() (which relies on grim_probability()'s internal +2).
   dx <- decimal_places_scalar(gsub(",", ".", trimws(x_str)))
-  if (percent) {
-    dx <- dx + 2L
-  }
   it <- suppressWarnings(as.integer(items))
   if (anyNA(c(x, n, it)) || n < 2 || it < 1) {
     return(NA)
@@ -305,10 +306,11 @@ evaluate_row <- function(
   # flagged as integer, skip them and say so; the Bounds checks (mean within
   # [min, max] and the Bhatia–Davis SD bound) still apply to continuous data.
   if (isTRUE(integer)) {
+    grim_label <- if (is_percent) "Percentage fails GRIM" else "Mean fails GRIM"
     grim_ok <- safe_grim(x_str, n_str, items, percent = is_percent)
     if (!is.na(grim_ok)) {
       tests_run <- c(tests_run, "GRIM")
-      if (!grim_ok) reasons <- c(reasons, "Mean fails GRIM")
+      if (!grim_ok) reasons <- c(reasons, grim_label)
     }
 
     if (sd_given && !is_percent) {
@@ -341,6 +343,11 @@ evaluate_row <- function(
       err = NULL
     ))
   }
+
+  # A mean that fails GRIM makes GRIMMER fail for the same "GRIM inconsistent"
+  # reason, which friendly_reason() maps back to "Mean fails GRIM". Drop the
+  # duplicate so the badge doesn't read "Mean fails GRIM; Mean fails GRIM".
+  reasons <- unique(reasons)
 
   list(
     ok = length(reasons) == 0,
@@ -381,7 +388,10 @@ evaluate_pair_ttest <- function(
   # statistics are complete, so flag it before the completeness checks below.
   if (!is.null(p_str) && nzchar(trimws(p_str))) {
     p_check <- parse_num(p_str)
-    if (is.na(p_check) || p_check < 0 || p_check > 1) {
+    if (is.na(p_check)) {
+      return(list(status = "error", msg = "Reported p must be a number"))
+    }
+    if (p_check < 0 || p_check > 1) {
       return(list(status = "error", msg = "Reported p must be between 0 and 1"))
     }
   }
